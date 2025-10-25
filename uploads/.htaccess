@@ -1,0 +1,12 @@
+# Proteger carpeta uploads
+Options -Indexes
+
+# Permitir solo imágenes
+<FilesMatch "\.(jpg|jpeg|png|gif|webp)$">
+    Require all granted
+</FilesMatch>
+
+# Denegar PHP
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>

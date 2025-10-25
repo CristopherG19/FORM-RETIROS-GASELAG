@@ -1,0 +1,19 @@
+# Configuración básica para Apache
+# GASELAG - Sistema de Retiros
+
+# Configuración de codificación
+AddDefaultCharset UTF-8
+
+# Proteger archivos que empiezan con punto
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Mostrar errores de PHP (solo para desarrollo)
+php_flag display_errors On
+php_value error_reporting E_ALL
+
+# Límites de upload
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_value max_execution_time 300

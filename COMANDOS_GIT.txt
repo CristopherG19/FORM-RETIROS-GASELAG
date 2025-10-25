@@ -1,0 +1,122 @@
+====================================================================
+    COMANDOS PARA SUBIR EL PROYECTO A GITHUB
+====================================================================
+
+IMPORTANTE: Copia y pega estos comandos uno por uno en Git Bash o PowerShell
+
+--------------------------------------------------------------------
+PASO 1: NAVEGAR A LA CARPETA DEL PROYECTO
+--------------------------------------------------------------------
+
+cd "C:\xampp\htdocs\form gaselag retiros"
+
+
+--------------------------------------------------------------------
+PASO 2: INICIALIZAR GIT
+--------------------------------------------------------------------
+
+git init
+
+
+--------------------------------------------------------------------
+PASO 3: CONFIGURAR USUARIO
+--------------------------------------------------------------------
+
+git config user.name "CristopherG19"
+git config user.email "cristopher.gutierrez@gaselag.com"
+
+
+--------------------------------------------------------------------
+PASO 4: AGREGAR TODOS LOS ARCHIVOS
+--------------------------------------------------------------------
+
+git add .
+
+
+--------------------------------------------------------------------
+PASO 5: CREAR COMMIT INICIAL
+--------------------------------------------------------------------
+
+git commit -m "Initial commit: Sistema de Retiro de Medidores GASELAG v1.0.0"
+
+
+--------------------------------------------------------------------
+PASO 6: RENOMBRAR RAMA A MAIN
+--------------------------------------------------------------------
+
+git branch -M main
+
+
+--------------------------------------------------------------------
+PASO 7: AGREGAR REPOSITORIO REMOTO
+--------------------------------------------------------------------
+
+git remote add origin https://github.com/CristopherG19/FORM-RETIROS-GASELAG.git
+
+
+--------------------------------------------------------------------
+PASO 8: SUBIR A GITHUB
+--------------------------------------------------------------------
+
+git push -u origin main
+
+
+====================================================================
+    AUTENTICACION
+====================================================================
+
+Cuando Git te pida credenciales:
+
+1. USUARIO: Tu usuario de GitHub (CristopherG19)
+2. CONTRASEÑA: Debes usar un Personal Access Token (NO tu contraseña)
+
+Para generar un Personal Access Token:
+1. Ve a: https://github.com/settings/tokens
+2. Click "Generate new token" (classic)
+3. Marca: repo (Full control of private repositories)
+4. Genera el token y cópialo
+5. Úsalo como "contraseña" cuando Git te lo pida
+
+====================================================================
+    VERIFICAR QUE SE SUBIO
+====================================================================
+
+Ve a tu navegador y visita:
+https://github.com/CristopherG19/FORM-RETIROS-GASELAG
+
+Deberías ver todos los archivos del proyecto.
+
+====================================================================
+    COMANDOS UTILES PARA EL FUTURO
+====================================================================
+
+# Ver estado del repositorio
+git status
+
+# Ver historial de commits
+git log --oneline
+
+# Actualizar después de cambios
+git add .
+git commit -m "Descripción del cambio"
+git push
+
+# Descargar cambios de GitHub
+git pull
+
+# Ver repositorios remotos configurados
+git remote -v
+
+====================================================================
+    SI GIT NO ESTA INSTALADO
+====================================================================
+
+Descarga e instala Git desde:
+https://git-scm.com/download/win
+
+Después de instalarlo, reinicia la terminal y vuelve a ejecutar
+los comandos desde el PASO 1.
+
+====================================================================
+
+

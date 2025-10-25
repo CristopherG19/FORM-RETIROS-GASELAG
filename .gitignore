@@ -1,0 +1,45 @@
+# Archivos y carpetas de desarrollo local
+uploads/*.png
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.gif
+!uploads/index.php
+!uploads/.htaccess
+
+# Configuración local (opcional, descomentar si tienes credenciales sensibles)
+# config/database.php
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos temporales
+*.tmp
+*.temp
+*.log
+
+# Archivos de respaldo
+*.bak
+*.backup
+*~
+
+# PHP
+vendor/
+composer.lock
+
+# Node modules (si se usa en el futuro)
+node_modules/
+package-lock.json
+
+# Archivos de prueba locales
+test.php
+prueba.php
+
+
