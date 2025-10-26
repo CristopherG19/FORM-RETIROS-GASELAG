@@ -115,14 +115,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $solidos_retenidos = ($medidor_retirado === 'SI' && isset($_POST['solidos_retenidos'])) ? $_POST['solidos_retenidos'] : null;
         $info_caja = ($medidor_retirado === 'SI' && !empty($_POST['info_caja'])) ? $_POST['info_caja'] : null;
 
-        // Información de imposibilidad
-        $visor_imposibilidad = null;
+        // Información de imposibilidad (nuevo sistema)
+        $tipo_imposibilidad_id = null;
+        $detalles_imposibilidad = null;
         if ($medidor_retirado === 'NO') {
-            $visor_imposibilidad_no_retirado = $_POST['visor_imposibilidad_no_retirado'] ?? null;
-            if ($visor_imposibilidad_no_retirado === 'SI') {
-                $visor_imposibilidad = 'SI';
-            } elseif ($visor_imposibilidad_no_retirado === 'NO') {
-                $visor_imposibilidad = 'NO';
+            $tipo_imposibilidad_id = $_POST['tipo_imposibilidad'] ?? null;
+            $detalles_imposibilidad = $_POST['detalles_imposibilidad'] ?? null;
+
+            // Mantener compatibilidad con el sistema anterior
+            $visor_imposibilidad = null;
+            if ($tipo_imposibilidad_id) {
+                // Si se seleccionó un tipo de imposibilidad relacionado con lectura, marcar como SI
+                $tipoInfo = getTipoImposibilidad($tipo_imposibilidad_id);
+                if ($tipoInfo && strpos(strtolower($tipoInfo['descripcion']), 'lectura') !== false) {
+                    $visor_imposibilidad = 'SI';
+                } else {
+                    $visor_imposibilidad = 'NO';
+                }
             }
         }
         
@@ -138,14 +147,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                               (isset($_POST['tecnico']) ? $_POST['tecnico'] : null);
 
         if ($columnExists) {
-            // Con la nueva estructura (incluyendo usuario_id)
+            // Con la nueva estructura (incluyendo usuario_id y tipos de imposibilidad)
             $sql = "INSERT INTO retiros_medidores (
                 orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
                 puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
                 medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
                 info_caja_medidor, observacion, foto_imposibilidad, tiene_foto,
-                tecnico_responsable, usuario_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                tecnico_responsable, usuario_id, tipo_imposibilidad_id, detalles_imposibilidad
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
             $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -164,15 +173,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fotoPath,
             $tiene_foto,
             $tecnicoResponsable,
-            $_SESSION['user_id']
+            $_SESSION['user_id'],
+            $tipo_imposibilidad_id,
+            $detalles_imposibilidad
         ]);
 
         // Obtener ID del registro insertado
         $registroId = $pdo->lastInsertId();
 
         // Registrar en auditoría
+        $tipoInfo = $tipo_imposibilidad_id ? getTipoImposibilidad($tipo_imposibilidad_id) : null;
+        $tipoDescripcion = $tipoInfo ? $tipoInfo['descripcion'] : 'Sin especificar';
         logAudit($registroId, $_SESSION['user_id'], 'registro_oc',
-                "Registro exitoso de OC: $currentOC - Retirado: $medidor_retirado",
+                "Registro exitoso de OC: $currentOC - Retirado: $medidor_retirado - Tipo: $tipoDescripcion",
                 $currentOC);
 
         error_log("Registro guardado exitosamente. ID: " . $registroId);
@@ -182,35 +195,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $userColumnExists = $pdo->query($checkUserColumnQuery)->rowCount() > 0;
 
             if ($userColumnExists) {
-                // Con usuario_id pero sin tiene_foto
-                $sql = "INSERT INTO retiros_medidores (
-                    orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
-                    puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
-                    medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
-                    info_caja_medidor, observacion, foto_imposibilidad,
-                    tecnico_responsable, usuario_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                // Verificar si existe la columna tipo_imposibilidad_id
+                $checkImposibilidadColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'tipo_imposibilidad_id'";
+                $imposibilidadColumnExists = $pdo->query($checkImposibilidadColumnQuery)->rowCount() > 0;
 
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $orden['id'],
-                    $currentOC,
-                    $medidor_retirado,
-                    $lectura_m3,
-                    $puntero_girando,
-                    $medidor_con_precinto,
-                    $visor_imposibilidad,
-                    $medidor_tiene_filtro,
-                    $filtro_buen_estado,
-                    $solidos_retenidos,
-                    $info_caja,
-                    $_POST['observacion'],
-                    $fotoPath,
-                    $tecnicoResponsable,
-                    $_SESSION['user_id']
-                ]);
+                if ($imposibilidadColumnExists) {
+                    // Con usuario_id y tipos de imposibilidad
+                    $sql = "INSERT INTO retiros_medidores (
+                        orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
+                        puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
+                        medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
+                        info_caja_medidor, observacion, foto_imposibilidad,
+                        tecnico_responsable, usuario_id, tipo_imposibilidad_id, detalles_imposibilidad
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                        $orden['id'],
+                        $currentOC,
+                        $medidor_retirado,
+                        $lectura_m3,
+                        $puntero_girando,
+                        $medidor_con_precinto,
+                        $visor_imposibilidad,
+                        $medidor_tiene_filtro,
+                        $filtro_buen_estado,
+                        $solidos_retenidos,
+                        $info_caja,
+                        $_POST['observacion'],
+                        $fotoPath,
+                        $tecnicoResponsable,
+                        $_SESSION['user_id'],
+                        $tipo_imposibilidad_id,
+                        $detalles_imposibilidad
+                    ]);
+                } else {
+                    // Con usuario_id pero sin tipos de imposibilidad
+                    $sql = "INSERT INTO retiros_medidores (
+                        orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
+                        puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
+                        medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
+                        info_caja_medidor, observacion, foto_imposibilidad,
+                        tecnico_responsable, usuario_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                        $orden['id'],
+                        $currentOC,
+                        $medidor_retirado,
+                        $lectura_m3,
+                        $puntero_girando,
+                        $medidor_con_precinto,
+                        $visor_imposibilidad,
+                        $medidor_tiene_filtro,
+                        $filtro_buen_estado,
+                        $solidos_retenidos,
+                        $info_caja,
+                        $_POST['observacion'],
+                        $fotoPath,
+                        $tecnicoResponsable,
+                        $_SESSION['user_id']
+                    ]);
+                }
             } else {
-                // Estructura anterior completa
+                // Estructura anterior completa (sin usuario_id ni tipos de imposibilidad)
                 $sql = "INSERT INTO retiros_medidores (
                     orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
                     puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
@@ -241,8 +290,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $registroId = $pdo->lastInsertId();
 
             // Registrar en auditoría
+            $tipoInfo = $tipo_imposibilidad_id ? getTipoImposibilidad($tipo_imposibilidad_id) : null;
+            $tipoDescripcion = $tipoInfo ? $tipoInfo['descripcion'] : 'Sin especificar';
             logAudit($registroId, $_SESSION['user_id'], 'registro_oc',
-                    "Registro exitoso de OC: $currentOC - Retirado: $medidor_retirado",
+                    "Registro exitoso de OC: $currentOC - Retirado: $medidor_retirado - Tipo: $tipoDescripcion",
                     $currentOC);
 
             error_log("Registro guardado exitosamente (estructura anterior). ID: " . $registroId);
@@ -542,35 +593,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <!-- PREGUNTA SOBRE IMPOSIBILIDAD (solo si NO se retiró) -->
                     <div id="pregunta_imposibilidad" style="display: none;">
                         <div class="section-title">
-                            <i class="bi bi-eye-slash"></i> IMPOSIBILIDAD DE LECTURA
+                            <i class="bi bi-exclamation-triangle"></i> MOTIVO DE IMPOSIBILIDAD
                         </div>
+                        <!-- TIPO DE IMPOSIBILIDAD (solo si NO se retiró) -->
                         <div class="mb-4">
-                            <label class="form-label">¿El medidor presenta imposibilidad de lectura?</label>
-                            <div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="visor_imposibilidad_no_retirado"
-                                           id="visor_imposibilidad_no_retirado_si" value="SI" required>
-                                    <label class="form-check-label" for="visor_imposibilidad_no_retirado_si">SÍ</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="visor_imposibilidad_no_retirado"
-                                           id="visor_imposibilidad_no_retirado_no" value="NO" required>
-                                    <label class="form-check-label" for="visor_imposibilidad_no_retirado_no">NO</label>
-                                </div>
-                            </div>
+                            <label for="tipo_imposibilidad" class="form-label">
+                                <i class="bi bi-exclamation-triangle"></i> Tipo de Imposibilidad *
+                            </label>
+                            <select class="form-select" id="tipo_imposibilidad" name="tipo_imposibilidad" required>
+                                <option value="">Seleccionar motivo...</option>
+                                <?php
+                                $tiposImposibilidad = getTiposImposibilidad();
+                                foreach ($tiposImposibilidad as $tipo) {
+                                    $categoriaIcon = match($tipo['categoria']) {
+                                        'acceso' => '🚪',
+                                        'medidor' => '⚡',
+                                        'cliente' => '👤',
+                                        'seguridad' => '⚠️',
+                                        'otros' => '📋',
+                                        default => '❓'
+                                    };
+                                    echo "<option value=\"{$tipo['id']}\">{$categoriaIcon} {$tipo['descripcion']}</option>\n";
+                                }
+                                ?>
+                            </select>
                             <div class="form-text">
-                                <strong class="text-info">Importante:</strong> Si marca "SÍ", se requiere evidencia fotográfica
+                                <strong class="text-info">Importante:</strong> Seleccione el motivo principal por el cual no se pudo realizar el retiro
+                            </div>
+                        </div>
+
+                        <!-- DETALLES ADICIONALES (opcional) -->
+                        <div class="mb-4">
+                            <label for="detalles_imposibilidad" class="form-label">
+                                <i class="bi bi-chat-left-text"></i> Detalles Adicionales
+                            </label>
+                            <textarea class="form-control" id="detalles_imposibilidad" name="detalles_imposibilidad"
+                                      rows="2" placeholder="Información adicional o detalles específicos..."></textarea>
+                            <div class="form-text">
+                                Proporcione detalles adicionales que ayuden a entender mejor la situación
                             </div>
                         </div>
                     </div>
 
                     <!-- OBSERVACIÓN (siempre visible) -->
                     <div class="section-title">
-                        <i class="bi bi-chat-left-text"></i> OBSERVACIÓN
+                        <i class="bi bi-chat-left-text"></i> OBSERVACIONES ADICIONALES
                     </div>
                     <div class="mb-4">
                         <textarea class="form-control" id="observacion" name="observacion" rows="3"
-                                  placeholder="Observaciones adicionales..." required></textarea>
+                                  placeholder="Información adicional que complemente el tipo de imposibilidad seleccionado..." required></textarea>
+                        <div class="form-text">
+                            <strong>Importante:</strong> Describa detalles específicos de la situación que no estén cubiertos por el tipo de imposibilidad seleccionado
+                        </div>
                     </div>
 
                     <!-- EVIDENCIA FOTOGRÁFICA (solo si NO se retiró) -->
@@ -634,9 +708,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Limpiar validaciones de NO retiro
                     document.getElementById('observacion').removeAttribute('required');
-                    document.querySelectorAll('input[name="visor_imposibilidad_no_retirado"]').forEach(function(el) {
-                        el.removeAttribute('required');
-                    });
+                    document.getElementById('tipo_imposibilidad').removeAttribute('required');
+                    document.getElementById('detalles_imposibilidad').removeAttribute('required');
                 } else {
                     camposRetiro.style.display = 'none';
                     campoFoto.style.display = 'block';
@@ -645,9 +718,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Hacer obligatorios los campos de NO retiro
                     document.getElementById('observacion').setAttribute('required', 'required');
-                    document.querySelectorAll('input[name="visor_imposibilidad_no_retirado"]').forEach(function(el) {
-                        el.setAttribute('required', 'required');
-                    });
+                    document.getElementById('tipo_imposibilidad').setAttribute('required', 'required');
+                    // detalles_imposibilidad es opcional
                 }
             }
         }
@@ -690,9 +762,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Limpiar validaciones de NO retiro
                     const observacion = document.getElementById('observacion');
                     if (observacion) observacion.removeAttribute('required');
-                    document.querySelectorAll('input[name="visor_imposibilidad_no_retirado"]').forEach(function(el) {
-                        el.removeAttribute('required');
-                    });
+                    const tipoImposibilidad = document.getElementById('tipo_imposibilidad');
+                    if (tipoImposibilidad) tipoImposibilidad.removeAttribute('required');
+                    const detallesImposibilidad = document.getElementById('detalles_imposibilidad');
+                    if (detallesImposibilidad) detallesImposibilidad.removeAttribute('required');
                 } else {
                     console.log('Mostrando campos de medidor NO retirado');
                     if (camposRetiro) camposRetiro.style.display = 'none';
@@ -703,9 +776,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Hacer obligatorios los campos de NO retiro
                     const observacion = document.getElementById('observacion');
                     if (observacion) observacion.setAttribute('required', 'required');
-                    document.querySelectorAll('input[name="visor_imposibilidad_no_retirado"]').forEach(function(el) {
-                        el.setAttribute('required', 'required');
-                    });
+                    const tipoImposibilidad = document.getElementById('tipo_imposibilidad');
+                    if (tipoImposibilidad) tipoImposibilidad.setAttribute('required', 'required');
+                    // detalles_imposibilidad es opcional
                 }
             }
 
@@ -771,21 +844,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     return false;
                 }
 
-                // Validar imposibilidad de lectura
-                const imposibilidad = document.querySelector('input[name="visor_imposibilidad_no_retirado"]:checked');
-                if (!imposibilidad) {
+                // Validar tipo de imposibilidad
+                const tipoImposibilidad = document.getElementById('tipo_imposibilidad');
+                if (!tipoImposibilidad.value) {
                     e.preventDefault();
-                    alert('Debe indicar si el medidor presenta imposibilidad de lectura');
+                    alert('Debe seleccionar el tipo de imposibilidad por el cual no se retiró el medidor');
                     return false;
                 }
 
-                // Si hay imposibilidad de lectura, la foto es obligatoria
-                if (imposibilidad.value === 'SI') {
-                    const fotoInput = document.getElementById('foto_imposibilidad');
-                    if (!fotoInput.files || fotoInput.files.length === 0) {
+                // Si se seleccionó "Otros", verificar que haya detalles
+                if (tipoImposibilidad.value === '11') { // ID del tipo "Otros"
+                    const detalles = document.getElementById('detalles_imposibilidad').value.trim();
+                    if (detalles === '') {
                         e.preventDefault();
-                        alert('Cuando hay imposibilidad de lectura, es obligatorio adjuntar foto de evidencia');
+                        alert('Debe especificar el motivo en los detalles cuando selecciona "Otros"');
                         return false;
+                    }
+                }
+
+                // Si hay foto, verificar que sea de imposibilidad de lectura o similar
+                const fotoInput = document.getElementById('foto_imposibilidad');
+                if (fotoInput.files && fotoInput.files.length > 0) {
+                    const tipoInfo = tipoImposibilidad.options[tipoImposibilidad.selectedIndex];
+                    const descripcionTipo = tipoInfo.text.toLowerCase();
+
+                    // Si el tipo sugiere que necesita evidencia fotográfica
+                    if (descripcionTipo.includes('lectura') ||
+                        descripcionTipo.includes('dañado') ||
+                        descripcionTipo.includes('averiado')) {
+                        console.log('Foto validada para tipo:', descripcionTipo);
                     }
                 }
             }

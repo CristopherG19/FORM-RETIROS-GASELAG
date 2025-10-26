@@ -155,7 +155,18 @@ $currentUser = getCurrentUser();
                 </div>
             </div>
 
-            <!-- Opción 6: Gestión de Usuarios (Solo Admin) -->
+            <!-- Opción 6: Tipos de Imposibilidad (Solo Admin) -->
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm" style="cursor: pointer;" onclick="location.href='pages/gestion_imposibilidad.php'">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                        <h5 class="card-title mt-3 mb-2">Tipos de Imposibilidad</h5>
+                        <p class="card-text text-muted small">Administrar motivos de no retiro</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Opción 7: Gestión de Usuarios (Solo Admin) -->
             <div class="col-md-4">
                 <div class="card h-100 border-0 shadow-sm" style="cursor: pointer;" onclick="location.href='pages/gestion_usuarios.php'">
                     <div class="card-body text-center p-4">
@@ -166,7 +177,7 @@ $currentUser = getCurrentUser();
                 </div>
             </div>
 
-            <!-- Opción 7: Exportar Excel (Solo Admin) -->
+            <!-- Opción 8: Exportar Excel (Solo Admin) -->
             <div class="col-md-4">
                 <div class="card h-100 border-0 shadow-sm" style="cursor: pointer;" onclick="location.href='pages/exportar_excel.php'">
                     <div class="card-body text-center p-4">

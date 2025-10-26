@@ -7,6 +7,8 @@ Sistema web profesional para la gestión y registro de retiros de medidores de a
 - ✅ **Sistema de Autenticación** con roles de usuario (Admin/Técnico)
 - ✅ **Aislamiento de datos** - Cada técnico ve solo sus registros
 - ✅ **Validación anti-duplicación** - Una OC solo se registra una vez
+- ✅ **Tipos de Imposibilidad** - Catálogo estructurado de motivos de no retiro
+- ✅ **Gestión de Imposibilidad** - Admin puede agregar/editar tipos de casos
 - ✅ **Control de acceso** basado en permisos por rol
 - ✅ **Sistema de auditoría completo** - Trazabilidad total de acciones
 - ✅ **Reasignación de registros** - Admin puede cambiar técnico responsable
@@ -64,14 +66,22 @@ Después de la instalación, el sistema crea automáticamente:
 - **Técnico 2:** `tecnico2` / `password`
 
 **Para instalaciones existentes:**
+
+**Paso 1 - Autenticación y Aislamiento:**
 ```
 Visita: http://localhost/form%20gaselag%20retiros/actualizar_aislamiento.php
+```
+
+**Paso 2 - Tipos de Imposibilidad:**
+```
+Visita: http://localhost/form%20gaselag%20retiros/actualizar_imposibilidad.php
 ```
 
 **O desde la página de inicio:**
 ```
 http://localhost/form%20gaselag%20retiros/INICIAR_AQUI.html
-→ Click en "Actualizar Sistema"
+→ Click en "Actualizar Sistema" (autenticación)
+→ Click en "Tipos de Imposibilidad" (catálogo de motivos)
 ```
 
 **Acceso al sistema:**
@@ -108,6 +118,7 @@ Por defecto usa:
 **Acceso completo a todas las funciones:**
 - ✅ Importar datos desde Excel
 - ✅ **Gestión de retiros** (ver todos, reasignar, reabrir)
+- ✅ **Gestión de tipos de imposibilidad** (crear, editar, activar/desactivar)
 - ✅ **Sistema de auditoría** (ver todas las acciones)
 - ✅ Consultar todos los registros (de todos los técnicos)
 - ✅ Ver casos críticos (sin evidencia fotográfica)
@@ -175,9 +186,18 @@ Por defecto usa:
 2. Buscar por código OC (ej: OC-00001)
 3. Agregar las OCs necesarias
 4. Click "Continuar con Vista Previa"
-5. Completar formulario para cada OC
+5. Completar formulario para cada OC:
+   - Si SÍ se retiró: Información del medidor y caja
+   - Si NO se retiró: Seleccionar tipo de imposibilidad + detalles + observaciones
 6. Click "Guardar"
 ```
+
+**Tipos de imposibilidad disponibles:**
+- 🚪 **Acceso:** Sin acceso, interior, no localizado, obra
+- ⚡ **Medidor:** Niple, no coincide, sin contómetro, dañado
+- 👤 **Cliente:** Oposición, ausente
+- ⚠️ **Seguridad:** Zona peligrosa
+- 📋 **Otros:** Cualquier motivo no contemplado
 
 ### 🔍 5. Consultar Registros *(Todos los usuarios)*
 ```
@@ -189,14 +209,34 @@ Por defecto usa:
 **Para Técnicos:** Solo ven sus propios registros
 **Para Administradores:** Ven todos los registros de todos los técnicos
 
-### ⚠️ 6. Casos Críticos *(Solo Administrador)*
+### ⚙️ 6. Gestión de Retiros *(Solo Administrador)*
+```
+1. Menu → "Gestión de Retiros"
+2. Ver todos los registros de todos los técnicos
+3. Filtrar por OC, técnico, estado o fecha
+4. Reasignar registros a otros técnicos si es necesario
+5. Reabrir OCs para nuevo registro si hay errores
+6. Ver historial de auditoría completo
+```
+
+### ⚠️ 7. Tipos de Imposibilidad *(Solo Administrador)*
+```
+1. Menu → "Tipos de Imposibilidad"
+2. Ver todos los tipos de imposibilidad disponibles
+3. Crear nuevos tipos según necesidades operativas
+4. Editar descripciones y categorías
+5. Activar/desactivar tipos según uso
+6. Ver estadísticas de uso de cada tipo
+```
+
+### ⚠️ 8. Casos Críticos *(Solo Administrador)*
 ```
 1. Menu → "Casos Críticos"
 2. Identificar registros no retirados sin evidencia fotográfica
 3. Gestionar seguimiento de casos problemáticos
 ```
 
-### 👥 7. Gestión de Usuarios *(Solo Administrador)*
+### 👥 9. Gestión de Usuarios *(Solo Administrador)*
 ```
 1. Menu → "Gestión de Usuarios"
 2. Crear nuevos usuarios (Admin/Técnico)
@@ -204,7 +244,7 @@ Por defecto usa:
 4. Asignar roles y permisos
 ```
 
-### 📤 8. Exportar Datos *(Solo Administrador)*
+### 📤 10. Exportar Datos *(Solo Administrador)*
 ```
 1. Menu → "Exportar Datos"
 2. Aplicar filtros según necesites
@@ -265,6 +305,21 @@ Sistema completo de auditoría y trazabilidad:
 - **Consulta:** Visualización de registros
 - **Reasignación:** Cambios de técnico responsable
 - **Reapertura:** Liberación de OCs para re-registro
+
+### Tabla: `tipos_imposibilidad` *(Nueva)*
+Catálogo de motivos de imposibilidad de retiro:
+
+- `codigo` - Identificador único del tipo
+- `descripcion` - Descripción del motivo de imposibilidad
+- `categoria` - Clasificación (acceso, medidor, cliente, seguridad, otros)
+- `activo` - Estado del tipo (disponible o no para nuevos registros)
+
+**Tipos predefinidos incluidos:**
+- **Acceso:** Sin acceso, interior, no localizado, obra
+- **Medidor:** Niple, no coincide, sin contómetro, dañado
+- **Cliente:** Oposición, ausente
+- **Seguridad:** Zona peligrosa
+- **Otros:** Motivos no categorizados
 
 ---
 
@@ -366,10 +421,18 @@ Logout:        http://localhost/form%20gaselag%20retiros/logout.php
 
 ### URLs de Gestión *(Solo Administrador)*
 ```
-Gestión Retiros: http://localhost/form%20gaselag%20retiros/pages/gestion_retiros.php
-Usuarios:        http://localhost/form%20gaselag%20retiros/pages/gestion_usuarios.php
-Casos Críticos:  http://localhost/form%20gaselag%20retiros/pages/reporte_imposibilidad.php
-Exportar:        http://localhost/form%20gaselag%20retiros/pages/exportar_excel.php
+Gestión Retiros:      http://localhost/form%20gaselag%20retiros/pages/gestion_retiros.php
+Tipos Imposibilidad:  http://localhost/form%20gaselag%20retiros/pages/gestion_imposibilidad.php
+Usuarios:             http://localhost/form%20gaselag%20retiros/pages/gestion_usuarios.php
+Casos Críticos:       http://localhost/form%20gaselag%20retiros/pages/reporte_imposibilidad.php
+Exportar:             http://localhost/form%20gaselag%20retiros/pages/exportar_excel.php
+```
+
+### URLs de Actualización *(Para instalaciones existentes)*
+```
+Actualizar Aislamiento: http://localhost/form%20gaselag%20retiros/actualizar_aislamiento.php
+Actualizar Imposibilidad: http://localhost/form%20gaselag%20retiros/actualizar_imposibilidad.php
+Página de Inicio:     http://localhost/form%20gaselag%20retiros/INICIAR_AQUI.html
 ```
 
 ### URLs Operativas *(Todos los usuarios)*

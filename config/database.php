@@ -568,5 +568,241 @@ function getUserInfo($userId) {
 function logUserAction($action, $details = '') {
     logAudit(null, $_SESSION['user_id'] ?? null, $action, $details);
 }
+
+// ===== GESTIÓN DE TIPOS DE IMPOSIBILIDAD =====
+
+// Función para obtener todos los tipos de imposibilidad activos
+function getTiposImposibilidad($categoria = null) {
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT id, codigo, descripcion, categoria
+                FROM tipos_imposibilidad
+                WHERE activo = 'SI'";
+
+        $params = [];
+
+        if ($categoria) {
+            $sql .= " AND categoria = ?";
+            $params[] = $categoria;
+        }
+
+        $sql .= " ORDER BY categoria, descripcion";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        error_log("Error al obtener tipos de imposibilidad: " . $e->getMessage());
+        return [];
+    }
+}
+
+// Función para obtener un tipo de imposibilidad por ID
+function getTipoImposibilidad($id) {
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT * FROM tipos_imposibilidad WHERE id = ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(1, $id);
+        $stmt->execute();
+
+        return $stmt->fetch();
+    } catch (PDOException $e) {
+        error_log("Error al obtener tipo de imposibilidad: " . $e->getMessage());
+        return null;
+    }
+}
+
+// Función para crear nuevo tipo de imposibilidad (solo admin)
+function createTipoImposibilidad($codigo, $descripcion, $categoria, $adminUserId) {
+    if (!isAdmin()) {
+        return false;
+    }
+
+    $pdo = getConnection();
+
+    try {
+        $sql = "INSERT INTO tipos_imposibilidad (codigo, descripcion, categoria, activo)
+                VALUES (?, ?, ?, 'SI')";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$codigo, $descripcion, $categoria]);
+
+        $newId = $pdo->lastInsertId();
+
+        // Registrar en auditoría
+        logAudit(null, $adminUserId, 'creacion_tipo_imposibilidad',
+                "Nuevo tipo creado: $codigo - $descripcion (Categoría: $categoria)",
+                null);
+
+        return $newId;
+    } catch (PDOException $e) {
+        error_log("Error al crear tipo de imposibilidad: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Función para actualizar tipo de imposibilidad (solo admin)
+function updateTipoImposibilidad($id, $codigo, $descripcion, $categoria, $activo, $adminUserId) {
+    if (!isAdmin()) {
+        return false;
+    }
+
+    $pdo = getConnection();
+
+    try {
+        $sql = "UPDATE tipos_imposibilidad
+                SET codigo = ?, descripcion = ?, categoria = ?, activo = ?, updated_at = NOW()
+                WHERE id = ?";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$codigo, $descripcion, $categoria, $activo, $id]);
+
+        // Obtener información anterior para auditoría
+        $oldInfo = getTipoImposibilidad($id);
+
+        // Registrar en auditoría
+        logAudit(null, $adminUserId, 'modificacion_tipo_imposibilidad',
+                "Tipo actualizado: {$oldInfo['codigo']} → $codigo, {$oldInfo['descripcion']} → $descripcion",
+                null);
+
+        return true;
+    } catch (PDOException $e) {
+        error_log("Error al actualizar tipo de imposibilidad: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Función para eliminar tipo de imposibilidad (solo admin)
+function deleteTipoImposibilidad($id, $adminUserId) {
+    if (!isAdmin()) {
+        return false;
+    }
+
+    $pdo = getConnection();
+
+    try {
+        $pdo->beginTransaction();
+
+        // Obtener información antes de eliminar
+        $tipoInfo = getTipoImposibilidad($id);
+
+        // Marcar como inactivo en lugar de eliminar
+        $sql = "UPDATE tipos_imposibilidad SET activo = 'NO', updated_at = NOW() WHERE id = ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$id]);
+
+        // Registrar en auditoría
+        logAudit(null, $adminUserId, 'eliminacion_tipo_imposibilidad',
+                "Tipo desactivado: {$tipoInfo['codigo']} - {$tipoInfo['descripcion']}",
+                null);
+
+        $pdo->commit();
+        return true;
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        error_log("Error al eliminar tipo de imposibilidad: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Función para obtener estadísticas por tipo de imposibilidad
+function getEstadisticasImposibilidad($userId = null) {
+    $pdo = getConnection();
+
+    try {
+        // Verificar si existe la columna tipo_imposibilidad_id
+        $columnExists = false;
+        try {
+            $checkColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'tipo_imposibilidad_id'";
+            $columnExists = $pdo->query($checkColumnQuery)->rowCount() > 0;
+        } catch (Exception $e) {
+            $columnExists = false;
+        }
+
+        if (!$columnExists) {
+            // Si no existe la columna, usar análisis de texto de observaciones
+            return getEstadisticasImposibilidadFromText($userId);
+        }
+
+        $sql = "SELECT
+                    ti.descripcion as tipo_imposibilidad,
+                    ti.categoria,
+                    COUNT(*) as cantidad,
+                    COUNT(CASE WHEN r.medidor_retirado = 'NO' THEN 1 END) as no_retirados,
+                    COUNT(CASE WHEN r.medidor_retirado = 'SI' THEN 1 END) as retirados
+                FROM retiros_medidores r
+                LEFT JOIN tipos_imposibilidad ti ON r.tipo_imposibilidad_id = ti.id
+                WHERE r.medidor_retirado = 'NO'";
+
+        $params = [];
+
+        // Aplicar filtro por usuario si es técnico
+        if (isUser() && $userColumnExists) {
+            $sql .= " AND r.usuario_id = ?";
+            $params[] = $userId ?: $_SESSION['user_id'];
+        }
+
+        $sql .= " GROUP BY ti.id, ti.descripcion, ti.categoria
+                  ORDER BY cantidad DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        error_log("Error al obtener estadísticas de imposibilidad: " . $e->getMessage());
+        return [];
+    }
+}
+
+// Función para obtener estadísticas analizando texto de observaciones (para compatibilidad)
+function getEstadisticasImposibilidadFromText($userId = null) {
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT
+                    CASE
+                        WHEN LOWER(r.observacion) LIKE '%niple%' THEN 'Se encontró conexión con niple'
+                        WHEN LOWER(r.observacion) LIKE '%opuso%' OR LOWER(r.observacion) LIKE '%oposición%' THEN 'Usuario se opuso al retiro'
+                        WHEN LOWER(r.observacion) LIKE '%interior%' THEN 'Servicio en interior de la propiedad'
+                        WHEN LOWER(r.observacion) LIKE '%peligro%' OR LOWER(r.observacion) LIKE '%riesgo%' THEN 'Zona peligrosa'
+                        WHEN LOWER(r.observacion) LIKE '%no coincide%' THEN 'Medidor no coincide con la orden'
+                        WHEN LOWER(r.observacion) LIKE '%contómetro%' THEN 'Sin contómetro'
+                        WHEN LOWER(r.observacion) LIKE '%obra%' OR LOWER(r.observacion) LIKE '%construcción%' THEN 'Obra en progreso'
+                        WHEN LOWER(r.observacion) LIKE '%ausente%' OR LOWER(r.observacion) LIKE '%nadie%' THEN 'Cliente ausente'
+                        WHEN LOWER(r.observacion) LIKE '%dañado%' OR LOWER(r.observacion) LIKE '%averiado%' THEN 'Medidor dañado'
+                        WHEN LOWER(r.observacion) LIKE '%no localizado%' OR LOWER(r.observacion) LIKE '%no encontrado%' THEN 'Medidor no localizado'
+                        ELSE 'Otros motivos'
+                    END as tipo_imposibilidad,
+                    COUNT(*) as cantidad
+                FROM retiros_medidores r
+                WHERE r.medidor_retirado = 'NO'
+                AND r.observacion IS NOT NULL
+                AND r.observacion != ''";
+
+        $params = [];
+
+        // Aplicar filtro por usuario si es técnico
+        if (isUser() && $userColumnExists) {
+            $sql .= " AND r.usuario_id = ?";
+            $params[] = $userId ?: $_SESSION['user_id'];
+        }
+
+        $sql .= " GROUP BY tipo_imposibilidad
+                  ORDER BY cantidad DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        error_log("Error al obtener estadísticas de imposibilidad desde texto: " . $e->getMessage());
+        return [];
+    }
+}
 ?>
 

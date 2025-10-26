@@ -9,13 +9,20 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 try {
     $pdo = getConnection();
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             r.*,
             o.*,
             r.id as retiro_id,
-            r.observacion as retiro_observacion
+            r.observacion as retiro_observacion,
+            ti.descripcion as tipo_imposibilidad_descripcion,
+            ti.categoria as tipo_imposibilidad_categoria,
+            ti.codigo as tipo_imposibilidad_codigo,
+            u.nombre_completo as registrado_por,
+            u.username as username_registrado
         FROM retiros_medidores r
         INNER JOIN ordenes_servicio o ON r.orden_servicio_id = o.id
+        LEFT JOIN tipos_imposibilidad ti ON r.tipo_imposibilidad_id = ti.id
+        LEFT JOIN usuarios u ON r.usuario_id = u.id
         WHERE r.id = ?
     ");
     $stmt->execute([$id]);
@@ -140,8 +147,18 @@ try {
                 <span><?= date('d/m/Y H:i', strtotime($data['fecha_registro'])) ?></span>
             </div>
             <div class="col-md-6">
-                <small class="text-muted d-block">Técnico Responsable</small>
-                <strong><?= htmlspecialchars($data['tecnico_responsable']) ?></strong>
+                <small class="text-muted d-block">Registrado por</small>
+                <?php if ($data['registrado_por']): ?>
+                    <div>
+                        <strong><?= htmlspecialchars($data['registrado_por']) ?></strong>
+                        <?php if ($data['username_registrado']): ?>
+                            <br><small class="text-muted">@<?= htmlspecialchars($data['username_registrado']) ?></small>
+                        <?php endif; ?>
+                    </div>
+                <?php else: ?>
+                    <strong><?= htmlspecialchars($data['tecnico_responsable']) ?></strong>
+                    <br><small class="text-muted">*Registro anterior al nuevo sistema</small>
+                <?php endif; ?>
             </div>
             <div class="col-md-6">
                 <small class="text-muted d-block">Estado del Retiro</small>
@@ -153,11 +170,40 @@ try {
             </div>
             <?php if ($data['medidor_retirado'] === 'NO'): ?>
                 <div class="col-md-6">
-                    <small class="text-muted d-block">Tipo de Caso</small>
-                    <?php if ($data['visor_imposibilidad_lectura'] === 'SI'): ?>
+                    <small class="text-muted d-block">Tipo de Imposibilidad</small>
+                    <?php if ($data['tipo_imposibilidad_descripcion']): ?>
+                        <?php
+                        $categoriaIcon = match($data['tipo_imposibilidad_categoria']) {
+                            'acceso' => '🚪',
+                            'medidor' => '⚡',
+                            'cliente' => '👤',
+                            'seguridad' => '⚠️',
+                            'otros' => '📋',
+                            default => '❓'
+                        };
+                        $badgeColor = match($data['tipo_imposibilidad_categoria']) {
+                            'acceso' => 'info',
+                            'medidor' => 'warning',
+                            'cliente' => 'secondary',
+                            'seguridad' => 'danger',
+                            'otros' => 'dark',
+                            default => 'secondary'
+                        };
+                        ?>
+                        <span class="badge bg-<?= $badgeColor ?>">
+                            <?= $categoriaIcon ?> <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?>
+                        </span>
+                        <?php if ($data['detalles_imposibilidad']): ?>
+                            <br><small class="text-muted">
+                                <i class="bi bi-chat-left-text"></i> <?= htmlspecialchars($data['detalles_imposibilidad']) ?>
+                            </small>
+                        <?php endif; ?>
+                    <?php elseif ($data['visor_imposibilidad_lectura'] === 'SI'): ?>
                         <span class="badge bg-info">📷 Imposibilidad de Lectura</span>
+                        <br><small class="text-muted">*Registro anterior al nuevo sistema</small>
                     <?php else: ?>
-                        <span class="badge bg-secondary">📋 No Retirado (Sin Especificar)</span>
+                        <span class="badge bg-secondary">📋 No Especificado</span>
+                        <br><small class="text-muted">*Registro anterior al nuevo sistema</small>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>

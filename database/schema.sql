@@ -133,6 +133,40 @@ CREATE TABLE IF NOT EXISTS auditoria_retiros (
     INDEX idx_orden_servicio (orden_servicio)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla de tipos de imposibilidad de retiro
+CREATE TABLE IF NOT EXISTS tipos_imposibilidad (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(20) NOT NULL UNIQUE,
+    descripcion VARCHAR(100) NOT NULL,
+    categoria ENUM('acceso', 'medidor', 'cliente', 'seguridad', 'otros') NOT NULL,
+    activo ENUM('SI', 'NO') NOT NULL DEFAULT 'SI',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_categoria (categoria),
+    INDEX idx_activo (activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Insertar tipos de imposibilidad predefinidos
+INSERT INTO tipos_imposibilidad (codigo, descripcion, categoria) VALUES
+('NIPLE', 'Se encontró conexión con niple', 'medidor'),
+('OPOSICION', 'Usuario se opuso al retiro', 'cliente'),
+('INTERIOR', 'Servicio en interior de la propiedad', 'acceso'),
+('PELIGROSA', 'Zona peligrosa o de difícil acceso', 'seguridad'),
+('NO_COINCIDE', 'Medidor no coincide con la orden', 'medidor'),
+('SIN_CONTOMETRO', 'Sin contómetro o dispositivo de medición', 'medidor'),
+('OBRA', 'Obra en progreso en la propiedad', 'acceso'),
+('AUSENTE', 'Cliente/usuario ausente', 'cliente'),
+('DANADO', 'Medidor dañado o averiado', 'medidor'),
+('NO_LOCALIZADO', 'Medidor no localizado en la dirección', 'acceso'),
+('OTROS', 'Otros motivos', 'otros');
+
+-- Modificar tabla de retiros para incluir tipo de imposibilidad
+ALTER TABLE retiros_medidores
+ADD COLUMN tipo_imposibilidad_id INT NULL,
+ADD COLUMN detalles_imposibilidad TEXT NULL,
+ADD FOREIGN KEY (tipo_imposibilidad_id) REFERENCES tipos_imposibilidad(id),
+ADD INDEX idx_tipo_imposibilidad (tipo_imposibilidad_id);
+
 -- Tabla de usuarios para el sistema de autenticación
 CREATE TABLE IF NOT EXISTS usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
