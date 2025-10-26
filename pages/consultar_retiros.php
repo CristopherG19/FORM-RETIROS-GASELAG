@@ -60,29 +60,18 @@ try {
         $userColumnExists = false;
     }
 
-    // DEBUG: Log para verificar el comportamiento
-    error_log("DEBUG consultar_retiros.php - Usuario: " . $currentUser['username'] . " - Rol: " . $currentUser['rol']);
-    error_log("DEBUG consultar_retiros.php - userColumnExists: " . ($userColumnExists ? 'true' : 'false'));
-    error_log("DEBUG consultar_retiros.php - userId: " . $_SESSION['user_id']);
-
     // Si es técnico y existe la columna usuario_id, filtrar por sus registros
     if (isUser() && $userColumnExists) {
         $sql .= " AND r.usuario_id = ?";
         $params[] = $_SESSION['user_id'];
 
-        error_log("DEBUG consultar_retiros.php - Filtro aplicado para técnico: usuario_id = " . $_SESSION['user_id']);
-
         // Registrar consulta en auditoría
         logAudit(null, $_SESSION['user_id'], 'consulta_registros',
                 'Consulta de registros propios desde consultar_retiros.php');
     } else if (isAdmin()) {
-        error_log("DEBUG consultar_retiros.php - Sin filtro (admin): mostrando todos los registros");
-
         // Admin ve todos los registros, registrar consulta general
         logAudit(null, $_SESSION['user_id'], 'consulta_registros',
                 'Consulta de todos los registros (admin) desde consultar_retiros.php');
-    } else {
-        error_log("DEBUG consultar_retiros.php - Sin columna usuario_id, mostrando todos los registros");
     }
     
     if (!empty($filtro_oc)) {
@@ -132,9 +121,6 @@ try {
     if (isUser() && $userColumnExists) {
         $statsSql .= " AND r.usuario_id = ?";
         $statsParams[] = $_SESSION['user_id'];
-        error_log("DEBUG consultar_retiros.php - Filtro de estadísticas aplicado para técnico: usuario_id = " . $_SESSION['user_id']);
-    } else {
-        error_log("DEBUG consultar_retiros.php - Sin filtro de estadísticas (admin o sin columna usuario_id)");
     }
 
     // Aplicar otros filtros si están activos
@@ -167,15 +153,11 @@ try {
     $stmt->execute($statsParams);
     $stats = $stmt->fetch();
 
-    error_log("DEBUG consultar_retiros.php - Estadísticas finales: Total={$stats['total']}, Retirados={$stats['retirados']}, NoRetirados={$stats['no_retirados']}");
-
     // Estadística de casos críticos (registros NO retirados SIN evidencia fotográfica)
     // NOTA: Cualquier registro "NO retirado" sin foto se considera crítico, independientemente del campo de imposibilidad
     // Para técnicos: solo sus casos críticos, para admin: todos
     $userIdForStats = (isUser() && $userColumnExists) ? $_SESSION['user_id'] : null;
     $casosProblematicos = countRetirosImposibilidadSinFoto($pdo, $userIdForStats);
-
-    error_log("DEBUG consultar_retiros.php - Casos críticos: {$casosProblematicos} (userIdForStats: " . ($userIdForStats ?: 'null') . ")");
 
 
 } catch (Exception $e) {
