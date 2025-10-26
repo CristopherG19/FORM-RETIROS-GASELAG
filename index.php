@@ -61,6 +61,25 @@ $hasOCs = isset($_SESSION['selected_ocs']) && count($_SESSION['selected_ocs']) >
             </div>
         </div>
 
+        <!-- Segunda fila de opciones -->
+        <div class="row g-4">
+            <!-- Opción 4: Reporte de Casos Críticos -->
+            <div class="col-md-6">
+                <div class="card h-100 border-0 shadow-sm" style="cursor: pointer;" onclick="location.href='pages/reporte_imposibilidad.php'">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+                        <h5 class="card-title mt-3 mb-2">Casos Críticos</h5>
+                        <p class="card-text text-muted small">Registros sin evidencia fotográfica</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Opción 5: Espacio vacío para mantener el diseño -->
+            <div class="col-md-6">
+                <!-- Espacio reservado para futuras opciones -->
+            </div>
+        </div>
+
         <!-- Información adicional -->
         <div class="card border-0 shadow-sm">
             <div class="card-body">
@@ -68,7 +87,8 @@ $hasOCs = isset($_SESSION['selected_ocs']) && count($_SESSION['selected_ocs']) >
                 <ol class="mb-0 small">
                     <li class="mb-2"><strong>Importar Datos:</strong> Primero debe cargar la información de las órdenes de servicio desde el archivo Excel.</li>
                     <li class="mb-2"><strong>Registrar Retiro:</strong> Busque las OCs por código y complete el formulario de retiro para cada medidor.</li>
-                    <li><strong>Consultar Registros:</strong> Revise el historial de todos los retiros realizados.</li>
+                    <li class="mb-2"><strong>Consultar Registros:</strong> Revise el historial de todos los retiros realizados.</li>
+                    <li><strong>Casos Críticos:</strong> Identifique registros no retirados sin evidencia fotográfica.</li>
                 </ol>
             </div>
         </div>

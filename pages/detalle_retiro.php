@@ -40,11 +40,11 @@ try {
                 <strong><?= htmlspecialchars($data['orden_servicio']) ?></strong>
             </div>
             <div class="col-md-6">
-                <small class="text-muted d-block">Cliente</small>
-                <strong><?= htmlspecialchars($data['cliente']) ?></strong>
+                <small class="text-muted d-block">Suministro</small>
+                <strong><?= htmlspecialchars($data['num_suministro']) ?></strong>
             </div>
             <div class="col-md-6">
-                <small class="text-muted d-block">Usuario Reclamante</small>
+                <small class="text-muted d-block">Usuario</small>
                 <span><?= htmlspecialchars($data['usuario_reclamante']) ?></span>
             </div>
             <div class="col-md-6">
@@ -66,6 +66,64 @@ try {
         </div>
     </div>
 </div>
+
+<!-- ALERTA PARA REGISTROS NO RETIRADOS -->
+<?php if ($data['medidor_retirado'] === 'NO' && (empty($data['foto_imposibilidad']))): ?>
+    <div class="alert alert-danger border-0 shadow-sm mb-4" role="alert">
+        <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+                <i class="bi bi-exclamation-triangle-fill" style="font-size: 2rem;"></i>
+            </div>
+            <div class="flex-grow-1 ms-3">
+                <h5 class="alert-heading mb-2">
+                    <i class="bi bi-camera"></i> REQUIERE EVIDENCIA FOTOGRÁFICA
+                </h5>
+                <p class="mb-2">
+                    <strong>❌ REGISTRO CRÍTICO - SIN EVIDENCIA FOTOGRÁFICA</strong>
+                </p>
+                <?php if ($data['visor_imposibilidad_lectura'] === 'SI'): ?>
+                    <p class="mb-2">
+                        Este registro indica imposibilidad de lectura pero no tiene foto de sustento.
+                        Es necesario contactar al técnico para que adjunte la evidencia fotográfica.
+                    </p>
+                <?php else: ?>
+                    <p class="mb-2">
+                        Este registro no especifica el motivo del no retiro y no tiene evidencia fotográfica.
+                        Es necesario contactar al técnico para que proporcione la evidencia correspondiente.
+                    </p>
+                <?php endif; ?>
+                <hr>
+                <p class="mb-0">
+                    <strong>Acción requerida:</strong> Solicitar al técnico
+                    <span class="badge bg-dark"> <?= htmlspecialchars($data['tecnico_responsable']) ?> </span>
+                    que proporcione evidencia fotográfica del estado del medidor.
+                </p>
+            </div>
+        </div>
+    </div>
+<?php elseif ($data['medidor_retirado'] === 'NO' && !empty($data['foto_imposibilidad'])): ?>
+    <div class="alert alert-success border-0 shadow-sm mb-4" role="alert">
+        <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+                <i class="bi bi-check-circle-fill" style="font-size: 2rem;"></i>
+            </div>
+            <div class="flex-grow-1 ms-3">
+                <h5 class="alert-heading mb-2">
+                    <i class="bi bi-check-circle"></i> REGISTRO COMPLETO
+                </h5>
+                <p class="mb-0">
+                    <?php if ($data['visor_imposibilidad_lectura'] === 'SI'): ?>
+                        <strong>✅ Imposibilidad de lectura con evidencia fotográfica</strong><br>
+                        Este registro está correctamente documentado.
+                    <?php else: ?>
+                        <strong>✅ No retiro con evidencia fotográfica</strong><br>
+                        Este registro está correctamente documentado.
+                    <?php endif; ?>
+                </p>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
 <!-- Información del Retiro -->
 <div class="card border-0 bg-light mb-3">
@@ -90,6 +148,16 @@ try {
                     <span class="badge bg-warning text-dark">✗ No Retirado</span>
                 <?php endif; ?>
             </div>
+            <?php if ($data['medidor_retirado'] === 'NO'): ?>
+                <div class="col-md-6">
+                    <small class="text-muted d-block">Tipo de Caso</small>
+                    <?php if ($data['visor_imposibilidad_lectura'] === 'SI'): ?>
+                        <span class="badge bg-info">📷 Imposibilidad de Lectura</span>
+                    <?php else: ?>
+                        <span class="badge bg-secondary">📋 No Retirado (Sin Especificar)</span>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
             <?php if ($data['medidor_retirado'] === 'SI' && !empty($data['lectura_m3'])): ?>
                 <div class="col-md-6">
                     <small class="text-muted d-block">Lectura m³</small>

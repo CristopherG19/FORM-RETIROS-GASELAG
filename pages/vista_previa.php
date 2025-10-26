@@ -54,13 +54,10 @@ try {
                         <thead class="table-dark sticky-top">
                             <tr>
                                 <th>#</th>
-                                <th>Orden Servicio</th>
-                                <th>Cliente</th>
-                                <th>Usuario Reclamante</th>
-                                <th>Dirección</th>
+                                <th>OC</th>
                                 <th>N° Serie Medidor</th>
-                                <th>Marca</th>
-                                <th>Modelo</th>
+                                <th>N° Suministro</th>
+                                <th>Dirección</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -68,12 +65,9 @@ try {
                                 <tr>
                                     <td><?= $index + 1 ?></td>
                                     <td><strong><?= htmlspecialchars($orden['orden_servicio']) ?></strong></td>
-                                    <td><?= htmlspecialchars($orden['cliente']) ?></td>
-                                    <td><?= htmlspecialchars($orden['usuario_reclamante']) ?></td>
-                                    <td><?= htmlspecialchars($orden['direccion']) ?></td>
                                     <td><?= htmlspecialchars($orden['num_serie_medidor']) ?></td>
-                                    <td><?= htmlspecialchars($orden['marca_medidor']) ?></td>
-                                    <td><?= htmlspecialchars($orden['modelo_medidor']) ?></td>
+                                    <td><?= htmlspecialchars($orden['num_suministro']) ?></td>
+                                    <td><?= htmlspecialchars($orden['direccion']) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

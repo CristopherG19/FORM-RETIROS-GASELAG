@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS retiros_medidores (
     medidor_retirado ENUM('SI', 'NO') NOT NULL,
     
     -- Información del medidor
-    lectura_m3 DECIMAL(10,3) NULL,
+    lectura_m3 INT NULL,
     
     -- Reporte visual del medidor
     puntero_girando ENUM('SI', 'NO') NULL,
@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS retiros_medidores (
     
     -- Foto de imposibilidad (si no se retiró)
     foto_imposibilidad VARCHAR(255) NULL,
+
+    -- Campo simplificado para exportación
+    tiene_foto ENUM('SI', 'NO') NOT NULL DEFAULT 'NO',
     
     -- Metadata
     tecnico_responsable VARCHAR(100) NULL,

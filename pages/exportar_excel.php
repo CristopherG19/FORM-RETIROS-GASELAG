@@ -92,7 +92,8 @@ fputcsv($output, [
     'Solidos Retenidos',
     'Info Caja y Medidor',
     'Observacion',
-    'Tecnico Responsable'
+    'Tecnico Responsable',
+    'Tiene Foto'
 ]); // Usar coma como delimitador estándar
 
 // Escribir datos
@@ -119,7 +120,8 @@ foreach ($retiros as $retiro) {
         $retiro['solidos_retenidos_filtro'] ?? '',
         $retiro['info_caja_medidor'] ?? '',
         $retiro['observacion'],
-        $retiro['tecnico_responsable']
+        $retiro['tecnico_responsable'],
+        (!empty($retiro['foto_imposibilidad'])) ? 'SÍ' : 'NO'
     ]); // Usar coma como delimitador estándar
 }
 

@@ -12,7 +12,9 @@ $ocData = null;
 
 // Buscar OC
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buscar_oc'])) {
-    $oc = trim($_POST['oc_code']);
+    $oc_numero = trim($_POST['oc_code']);
+    // Agregar prefijo OC- automáticamente
+    $oc = 'OC-' . $oc_numero;
     
     try {
         $pdo = getConnection();
@@ -112,16 +114,20 @@ if (isset($_GET['limpiar'])) {
 
                         <form method="POST" action="">
                             <div class="mb-3">
-                                <label for="oc_code" class="form-label">Código de OC</label>
-                                <input 
-                                    type="text" 
-                                    class="form-control form-control-lg" 
-                                    id="oc_code" 
-                                    name="oc_code" 
-                                    placeholder="Ej: OC-00001"
-                                    required
-                                    autofocus
-                                >
+                                <label for="oc_code" class="form-label">Número de OC</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-light">OC-</span>
+                                    <input 
+                                        type="text" 
+                                        class="form-control" 
+                                        id="oc_code" 
+                                        name="oc_code" 
+                                        placeholder="00001"
+                                        required
+                                        autofocus
+                                    >
+                                </div>
+                                <small class="text-muted">Ingrese solo el número sin el prefijo OC-</small>
                             </div>
                             <button type="submit" name="buscar_oc" class="btn btn-primary w-100">
                                 <i class="bi bi-search"></i> Buscar
