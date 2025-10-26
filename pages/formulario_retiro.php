@@ -35,8 +35,39 @@ try {
     die("Error: " . $e->getMessage());
 }
 
-$message = '';
-$messageType = '';
+// ===== VALIDACIÓN ANTI-DUPLICACIÓN =====
+// Verificar si esta OC ya fue registrada por alguien
+$existingRetiro = checkExistingRetiro($currentOC);
+if ($existingRetiro) {
+    // Registrar intento en auditoría
+    logAudit(null, $_SESSION['user_id'], 'intento_registro_oc',
+             "Intento de registro de OC ya procesada: $currentOC por {$existingRetiro['tecnico_responsable']}",
+             $currentOC);
+
+    // Si es admin, permitir continuar con reapertura
+    if (isAdmin()) {
+        $message = "⚠️ <strong>Esta OC ya fue registrada</strong> por: <strong>{$existingRetiro['tecnico_responsable']}</strong> el " .
+                  date('d/m/Y H:i', strtotime($existingRetiro['fecha_registro'])) .
+                  ". Como administrador, puede <strong>reabrir</strong> esta OC para nuevo registro.";
+        $messageType = 'warning';
+    } else {
+        // Si es técnico, bloquear completamente
+        $message = "❌ <strong>Esta OC ya fue registrada</strong> por: <strong>{$existingRetiro['tecnico_responsable']}</strong> el " .
+                  date('d/m/Y H:i', strtotime($existingRetiro['fecha_registro'])) .
+                  ". No se puede registrar nuevamente.";
+        $messageType = 'danger';
+
+        // Mostrar información adicional del registro existente
+        if ($existingRetiro['medidor_retirado'] === 'SI') {
+            $message .= " <em>(Medidor SÍ fue retirado)</em>";
+        } else {
+            $message .= " <em>(Medidor NO fue retirado)</em>";
+        }
+    }
+}
+
+// Obtener usuario actual para auto-asignación
+$currentUser = getCurrentUser();
 
 // Procesar formulario
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -102,14 +133,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $checkColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'tiene_foto'";
         $columnExists = $pdo->query($checkColumnQuery)->rowCount() > 0;
 
+        // Obtener técnico del campo oculto
+        $tecnicoResponsable = isset($_POST['tecnico_hidden']) ? $_POST['tecnico_hidden'] :
+                              (isset($_POST['tecnico']) ? $_POST['tecnico'] : null);
+
         if ($columnExists) {
-            // Con la nueva estructura
+            // Con la nueva estructura (incluyendo usuario_id)
             $sql = "INSERT INTO retiros_medidores (
                 orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
                 puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
                 medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
-                info_caja_medidor, observacion, foto_imposibilidad, tiene_foto, tecnico_responsable
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                info_caja_medidor, observacion, foto_imposibilidad, tiene_foto,
+                tecnico_responsable, usuario_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
             $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -127,40 +163,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['observacion'],
             $fotoPath,
             $tiene_foto,
-            isset($_POST['tecnico']) ? $_POST['tecnico'] : null
+            $tecnicoResponsable,
+            $_SESSION['user_id']
         ]);
 
-        error_log("Registro guardado exitosamente. ID: " . $pdo->lastInsertId());
+        // Obtener ID del registro insertado
+        $registroId = $pdo->lastInsertId();
+
+        // Registrar en auditoría
+        logAudit($registroId, $_SESSION['user_id'], 'registro_oc',
+                "Registro exitoso de OC: $currentOC - Retirado: $medidor_retirado",
+                $currentOC);
+
+        error_log("Registro guardado exitosamente. ID: " . $registroId);
         } else {
-            // Sin la nueva columna (estructura anterior)
-            $sql = "INSERT INTO retiros_medidores (
-                orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
-                puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
-                medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
-                info_caja_medidor, observacion, foto_imposibilidad, tecnico_responsable
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            // Verificar si existe la columna usuario_id para agregarla
+            $checkUserColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'usuario_id'";
+            $userColumnExists = $pdo->query($checkUserColumnQuery)->rowCount() > 0;
 
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([
-                $orden['id'],
-                $currentOC,
-                $medidor_retirado,
-                $lectura_m3,
-                $puntero_girando,
-                $medidor_con_precinto,
-                $visor_imposibilidad,
-                $medidor_tiene_filtro,
-                $filtro_buen_estado,
-                $solidos_retenidos,
-                $info_caja,
-                $_POST['observacion'],
-                $fotoPath,
-                isset($_POST['tecnico']) ? $_POST['tecnico'] : null
-            ]);
+            if ($userColumnExists) {
+                // Con usuario_id pero sin tiene_foto
+                $sql = "INSERT INTO retiros_medidores (
+                    orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
+                    puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
+                    medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
+                    info_caja_medidor, observacion, foto_imposibilidad,
+                    tecnico_responsable, usuario_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-            error_log("Registro guardado exitosamente (estructura anterior). ID: " . $pdo->lastInsertId());
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    $orden['id'],
+                    $currentOC,
+                    $medidor_retirado,
+                    $lectura_m3,
+                    $puntero_girando,
+                    $medidor_con_precinto,
+                    $visor_imposibilidad,
+                    $medidor_tiene_filtro,
+                    $filtro_buen_estado,
+                    $solidos_retenidos,
+                    $info_caja,
+                    $_POST['observacion'],
+                    $fotoPath,
+                    $tecnicoResponsable,
+                    $_SESSION['user_id']
+                ]);
+            } else {
+                // Estructura anterior completa
+                $sql = "INSERT INTO retiros_medidores (
+                    orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
+                    puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
+                    medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
+                    info_caja_medidor, observacion, foto_imposibilidad, tecnico_responsable
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    $orden['id'],
+                    $currentOC,
+                    $medidor_retirado,
+                    $lectura_m3,
+                    $puntero_girando,
+                    $medidor_con_precinto,
+                    $visor_imposibilidad,
+                    $medidor_tiene_filtro,
+                    $filtro_buen_estado,
+                    $solidos_retenidos,
+                    $info_caja,
+                    $_POST['observacion'],
+                    $fotoPath,
+                    $tecnicoResponsable
+                ]);
+            }
+
+            // Obtener ID del registro insertado
+            $registroId = $pdo->lastInsertId();
+
+            // Registrar en auditoría
+            logAudit($registroId, $_SESSION['user_id'], 'registro_oc',
+                    "Registro exitoso de OC: $currentOC - Retirado: $medidor_retirado",
+                    $currentOC);
+
+            error_log("Registro guardado exitosamente (estructura anterior). ID: " . $registroId);
         }
-        
+
         // Redirigir al siguiente formulario o a la página de finalización
         $nextIndex = $currentIndex + 1;
         if ($nextIndex < $totalOCs) {
@@ -287,14 +374,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                     <?php endif; ?>
 
-                    <!-- Técnico Responsable -->
+                    <!-- Técnico Responsable (Auto-asignado) -->
                     <div class="mb-4">
                         <label for="tecnico" class="form-label">
-                            <i class="bi bi-person"></i> Técnico Responsable *
+                            <i class="bi bi-person-check"></i> Técnico Responsable *
                         </label>
                         <input type="text" class="form-control" id="tecnico" name="tecnico"
-                               placeholder="Nombre del técnico" required>
-                        <div class="form-text">* Campo obligatorio</div>
+                               value="<?php echo htmlspecialchars($currentUser['nombre_completo']); ?>"
+                               readonly style="background-color: #e9ecef; cursor: not-allowed;">
+                        <input type="hidden" id="tecnico_hidden" name="tecnico"
+                               value="<?php echo htmlspecialchars($currentUser['nombre_completo']); ?>">
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i>
+                            Auto-asignado: <?php echo htmlspecialchars($currentUser['nombre_completo']); ?>
+                            (<?php echo htmlspecialchars($currentUser['username']); ?>)
+                        </div>
                     </div>
 
                     <!-- Pregunta Principal -->

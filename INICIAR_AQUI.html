@@ -83,6 +83,16 @@
         
         <div class="info">
             <strong>✅ Puerto MySQL: 3307 (Configurado)</strong>
+            <br><br>
+            <strong>🔐 Sistema con Autenticación</strong><br>
+            El sistema ahora incluye login con roles de usuario
+        </div>
+
+        <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+            <strong>👤 Usuarios por Defecto:</strong><br>
+            <strong>Admin:</strong> admin / password<br>
+            <strong>Técnico 1:</strong> tecnico1 / password<br>
+            <strong>Técnico 2:</strong> tecnico2 / password
         </div>
 
         <div class="steps">
@@ -101,15 +111,31 @@
                 🔧 Instalar / Configurar BD
             </a>
             <br>
-            <small style="color: #666;">Primera vez o reinstalación</small>
+            <small style="color: #666;">Primera vez o reinstalación completa</small>
+        </div>
+
+        <div style="margin: 30px 0;">
+            <a href="actualizar_aislamiento.php" class="button secondary">
+                🔄 Actualizar Sistema
+            </a>
+            <br>
+            <small style="color: #666;">Agregar autenticación y aislamiento de datos</small>
+        </div>
+
+        <div style="margin: 30px 0;">
+            <a href="login.php" class="button">
+                🔐 Iniciar Sesión
+            </a>
+            <br>
+            <small style="color: #666;">Acceder al sistema con usuario y contraseña</small>
         </div>
 
         <div style="margin: 30px 0;">
             <a href="index.php" class="button secondary">
-                🏠 Ir al Sistema
+                🏠 Panel Principal
             </a>
             <br>
-            <small style="color: #666;">Ya está instalado</small>
+            <small style="color: #666;">Requiere autenticación</small>
         </div>
 
         <div style="margin: 30px 0;">
@@ -124,8 +150,9 @@
 
         <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">
             <strong>⚠️ Primer Uso:</strong><br>
-            Si es la primera vez, haz clic en <strong>"Instalar / Configurar BD"</strong><br>
-            El instalador creará todo automáticamente en 3 pasos.
+            1. Haz clic en <strong>"Instalar / Configurar BD"</strong> para crear la base de datos<br>
+            2. O <strong>"Actualizar Sistema"</strong> para agregar autenticación a una instalación existente<br>
+            3. Luego usa <strong>"Iniciar Sesión"</strong> con las credenciales mostradas arriba
         </div>
     </div>
 </body>

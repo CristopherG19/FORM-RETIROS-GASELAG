@@ -46,14 +46,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['agregar_oc'])) {
         $stmt->execute([$oc]);
         
         if ($stmt->fetch()) {
-            // Verificar que no esté ya agregada
-            if (!in_array($oc, $_SESSION['selected_ocs'])) {
-                $_SESSION['selected_ocs'][] = $oc;
-                $message = "OC agregada correctamente";
-                $messageType = 'success';
+            // ===== VALIDACIÓN ANTI-DUPLICACIÓN =====
+            // Verificar si esta OC ya fue registrada por alguien
+            $existingRetiro = checkExistingRetiro($oc);
+
+            if ($existingRetiro) {
+                // Registrar intento en auditoría
+                logAudit(null, $_SESSION['user_id'], 'busqueda_oc',
+                         "Intento de búsqueda de OC ya procesada: $oc por {$existingRetiro['tecnico_responsable']}",
+                         $oc);
+
+                if (isAdmin()) {
+                    // Admin puede ver y decidir qué hacer
+                    $message = "⚠️ <strong>Esta OC ya fue registrada</strong> por: <strong>{$existingRetiro['tecnico_responsable']}</strong> el " .
+                              date('d/m/Y H:i', strtotime($existingRetiro['fecha_registro'])) .
+                              ". Como administrador, puede reabrir esta OC si es necesario.";
+                    $messageType = 'warning';
+
+                    // Mostrar información adicional del registro
+                    $estadoInfo = "";
+                    if ($existingRetiro['medidor_retirado'] === 'SI') {
+                        $estadoInfo = " <em>(Medidor SÍ fue retirado)</em>";
+                    } else {
+                        $estadoInfo = " <em>(Medidor NO fue retirado)</em>";
+                    }
+                    $message .= $estadoInfo;
+
+                } else {
+                    // Técnico no puede procesar OC ya registrada
+                    $message = "❌ <strong>Esta OC ya fue registrada</strong> por: <strong>{$existingRetiro['tecnico_responsable']}</strong> el " .
+                              date('d/m/Y H:i', strtotime($existingRetiro['fecha_registro'])) .
+                              ". No se puede procesar nuevamente.";
+                    $messageType = 'danger';
+
+                    // Mostrar información adicional
+                    $estadoInfo = "";
+                    if ($existingRetiro['medidor_retirado'] === 'SI') {
+                        $estadoInfo = " <em>(Medidor SÍ fue retirado)</em>";
+                    } else {
+                        $estadoInfo = " <em>(Medidor NO fue retirado)</em>";
+                    }
+                    $message .= $estadoInfo;
+                }
             } else {
-                $message = "Esta OC ya fue agregada";
-                $messageType = 'info';
+                // OC no registrada, verificar que no esté ya en la sesión
+                if (!in_array($oc, $_SESSION['selected_ocs'])) {
+                    $_SESSION['selected_ocs'][] = $oc;
+
+                    // Registrar búsqueda exitosa en auditoría
+                    logAudit(null, $_SESSION['user_id'], 'busqueda_oc',
+                             "OC agregada a la sesión: $oc",
+                             $oc);
+
+                    $message = "✅ OC agregada correctamente a la sesión";
+                    $messageType = 'success';
+                } else {
+                    $message = "ℹ️ Esta OC ya fue agregada a la sesión actual";
+                    $messageType = 'info';
+                }
             }
         }
     } catch (Exception $e) {

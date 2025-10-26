@@ -51,39 +51,51 @@ CREATE TABLE IF NOT EXISTS retiros_medidores (
     orden_servicio_id INT NOT NULL,
     orden_servicio VARCHAR(50) NOT NULL,
     medidor_retirado ENUM('SI', 'NO') NOT NULL,
-    
+
     -- Información del medidor
     lectura_m3 INT NULL,
-    
+
     -- Reporte visual del medidor
     puntero_girando ENUM('SI', 'NO') NULL,
     medidor_con_precinto ENUM('SI', 'NO') NULL,
     visor_imposibilidad_lectura ENUM('SI', 'NO') NULL,
-    
+
     -- Reporte visual del filtro
     medidor_tiene_filtro ENUM('SI', 'NO') NULL,
     filtro_buen_estado ENUM('SI', 'NO') NULL,
     solidos_retenidos_filtro ENUM('SI', 'NO') NULL,
-    
+
     -- Información adicional
     info_caja_medidor TEXT NULL,
     observacion TEXT NULL,
-    
+
     -- Foto de imposibilidad (si no se retiró)
     foto_imposibilidad VARCHAR(255) NULL,
 
     -- Campo simplificado para exportación
     tiene_foto ENUM('SI', 'NO') NOT NULL DEFAULT 'NO',
-    
-    -- Metadata
+
+    -- Sistema de aislamiento de datos
+    usuario_id INT NULL, -- Quién registró el retiro
     tecnico_responsable VARCHAR(100) NULL,
+    estado_registro ENUM('activo', 'reabierto', 'reasignado') NOT NULL DEFAULT 'activo',
+    usuario_reasignado_por INT NULL, -- Admin que reasignó
+    fecha_reasignacion TIMESTAMP NULL,
+    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Metadata
     fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (orden_servicio_id) REFERENCES ordenes_servicio(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_reasignado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
     INDEX idx_orden_servicio (orden_servicio),
-    INDEX idx_fecha_registro (fecha_registro)
+    INDEX idx_fecha_registro (fecha_registro),
+    INDEX idx_usuario_id (usuario_id),
+    INDEX idx_estado_registro (estado_registro),
+    INDEX idx_fecha_asignacion (fecha_asignacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabla para la sesión temporal de OCs seleccionadas
@@ -93,6 +105,32 @@ CREATE TABLE IF NOT EXISTS sesiones_oc (
     orden_servicio VARCHAR(50) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_session (session_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla para auditoría de acciones del sistema
+CREATE TABLE IF NOT EXISTS auditoria_retiros (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    retiro_id INT NULL, -- NULL para acciones que no involucran un retiro específico
+    usuario_id INT NOT NULL,
+    accion ENUM(
+        'login', 'logout',
+        'busqueda_oc', 'intento_registro_oc', 'registro_oc',
+        'consulta_registros', 'consulta_registro_detalle',
+        'reasignacion_oc', 'reapertura_oc',
+        'modificacion_registro', 'eliminacion_registro'
+    ) NOT NULL,
+    detalles TEXT NULL, -- Información adicional sobre la acción
+    orden_servicio VARCHAR(50) NULL, -- OC involucrada (si aplica)
+    ip_address VARCHAR(45) NULL,
+    user_agent TEXT NULL,
+    fecha_accion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (retiro_id) REFERENCES retiros_medidores(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    INDEX idx_retiro_id (retiro_id),
+    INDEX idx_usuario_id (usuario_id),
+    INDEX idx_fecha_accion (fecha_accion),
+    INDEX idx_accion (accion),
+    INDEX idx_orden_servicio (orden_servicio)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabla de usuarios para el sistema de autenticación

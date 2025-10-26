@@ -5,14 +5,20 @@ Sistema web profesional para la gestión y registro de retiros de medidores de a
 ## 📋 Características
 
 - ✅ **Sistema de Autenticación** con roles de usuario (Admin/Técnico)
+- ✅ **Aislamiento de datos** - Cada técnico ve solo sus registros
+- ✅ **Validación anti-duplicación** - Una OC solo se registra una vez
 - ✅ **Control de acceso** basado en permisos por rol
+- ✅ **Sistema de auditoría completo** - Trazabilidad total de acciones
+- ✅ **Reasignación de registros** - Admin puede cambiar técnico responsable
+- ✅ **Reapertura de OCs** - Admin puede liberar OCs para re-registro
 - ✅ **Importación masiva** de órdenes de servicio desde Excel *(Solo Admin)*
-- ✅ **Búsqueda rápida** por código OC
+- ✅ **Búsqueda rápida** por código OC con validación previa
 - ✅ **Formularios inteligentes** que se adaptan según el estado del retiro
 - ✅ **Gestión de fotos** con nomenclatura automática
 - ✅ **Consulta avanzada** con múltiples filtros
 - ✅ **Exportación a CSV** compatible con Excel *(Solo Admin)*
 - ✅ **Gestión de usuarios** para administradores *(Solo Admin)*
+- ✅ **Gestión de retiros** con control total para administradores *(Solo Admin)*
 - ✅ **Interfaz moderna** con Bootstrap 5
 - ✅ **Responsive** (funciona en tablets y móviles)
 
@@ -59,7 +65,13 @@ Después de la instalación, el sistema crea automáticamente:
 
 **Para instalaciones existentes:**
 ```
-Visita: http://localhost/form%20gaselag%20retiros/actualizar_sistema.php
+Visita: http://localhost/form%20gaselag%20retiros/actualizar_aislamiento.php
+```
+
+**O desde la página de inicio:**
+```
+http://localhost/form%20gaselag%20retiros/INICIAR_AQUI.html
+→ Click en "Actualizar Sistema"
 ```
 
 **Acceso al sistema:**
@@ -95,20 +107,27 @@ Por defecto usa:
 ### 🔐 Administrador
 **Acceso completo a todas las funciones:**
 - ✅ Importar datos desde Excel
-- ✅ Registrar retiros de medidores
-- ✅ Consultar todos los registros
+- ✅ **Gestión de retiros** (ver todos, reasignar, reabrir)
+- ✅ **Sistema de auditoría** (ver todas las acciones)
+- ✅ Consultar todos los registros (de todos los técnicos)
 - ✅ Ver casos críticos (sin evidencia fotográfica)
 - ✅ Exportar datos a Excel
 - ✅ **Gestión de usuarios** (crear, activar/desactivar, eliminar)
+- ✅ **Reasignación de registros** entre técnicos
+- ✅ **Reapertura de OCs** para nuevo registro
 
 ### 👨‍🔧 Técnico
-**Acceso limitado a funciones operativas:**
+**Acceso limitado con aislamiento de datos:**
 - ❌ Importar datos (bloqueado)
+- ✅ **Solo ve sus propios registros** (aislamiento de datos)
+- ✅ **Validación anti-duplicación** (no puede registrar OC ya procesada)
+- ✅ **Auto-asignación** (el sistema asigna automáticamente el usuario)
 - ✅ Registrar retiros de medidores
-- ✅ Consultar registros propios y del equipo
+- ✅ Consultar **solo sus propios registros**
 - ❌ Ver casos críticos (bloqueado)
 - ❌ Exportar datos (bloqueado)
 - ❌ Gestión de usuarios (bloqueado)
+- ❌ Ver registros de otros técnicos (bloqueado)
 
 ---
 
@@ -134,7 +153,23 @@ Por defecto usa:
 
 **Importante:** No incluir la fila de encabezados, solo los datos.
 
-### 🔧 3. Registrar Retiro *(Todos los usuarios)*
+### ⚙️ 3. Gestión de Retiros *(Solo Administrador)*
+```
+1. Menu → "Gestión de Retiros"
+2. Ver todos los registros de todos los técnicos
+3. Filtrar por OC, técnico, estado o fecha
+4. Reasignar registros a otros técnicos si es necesario
+5. Reabrir OCs para nuevo registro si hay errores
+6. Ver historial de auditoría completo
+```
+
+**Funciones disponibles:**
+- **Reasignación:** Cambiar técnico responsable de una OC
+- **Reapertura:** Liberar OC para que otro técnico la registre
+- **Auditoría:** Ver quién accedió, cuándo y qué hizo
+- **Filtros avanzados:** Buscar por múltiples criterios
+
+### 🔧 4. Registrar Retiro *(Todos los usuarios)*
 ```
 1. Menu → "Registrar Retiro"
 2. Buscar por código OC (ej: OC-00001)
@@ -144,20 +179,24 @@ Por defecto usa:
 6. Click "Guardar"
 ```
 
-### 🔍 4. Consultar Registros *(Todos los usuarios)*
+### 🔍 5. Consultar Registros *(Todos los usuarios)*
 ```
 1. Menu → "Consultar Registros"
 2. Aplicar filtros opcionales
 3. Click ícono 👁️ para ver detalles
 ```
-### ⚠️ 5. Casos Críticos *(Solo Administrador)*
+
+**Para Técnicos:** Solo ven sus propios registros
+**Para Administradores:** Ven todos los registros de todos los técnicos
+
+### ⚠️ 6. Casos Críticos *(Solo Administrador)*
 ```
 1. Menu → "Casos Críticos"
 2. Identificar registros no retirados sin evidencia fotográfica
 3. Gestionar seguimiento de casos problemáticos
 ```
 
-### 👥 6. Gestión de Usuarios *(Solo Administrador)*
+### 👥 7. Gestión de Usuarios *(Solo Administrador)*
 ```
 1. Menu → "Gestión de Usuarios"
 2. Crear nuevos usuarios (Admin/Técnico)
@@ -165,7 +204,7 @@ Por defecto usa:
 4. Asignar roles y permisos
 ```
 
-### 📤 7. Exportar Datos *(Solo Administrador)*
+### 📤 8. Exportar Datos *(Solo Administrador)*
 ```
 1. Menu → "Exportar Datos"
 2. Aplicar filtros según necesites
@@ -179,7 +218,7 @@ Por defecto usa:
 ### Tabla: `ordenes_servicio`
 Almacena toda la información importada del Excel (33 campos).
 
-### Tabla: `retiros_medidores`
+### Tabla: `retiros_medidores` *(Actualizada)*
 Registra cada retiro realizado:
 - Estado del retiro (SI/NO)
 - Lecturas del medidor
@@ -187,6 +226,13 @@ Registra cada retiro realizado:
 - Información del filtro
 - Observaciones
 - Fotos de imposibilidad
+
+**Nuevos campos para aislamiento de datos:**
+- `usuario_id` - Técnico que registró el retiro
+- `estado_registro` - activo/reabierto/reasignado
+- `usuario_reasignado_por` - Admin que hizo reasignación
+- `fecha_reasignacion` - Cuándo se reasignó
+- `fecha_asignacion` - Cuándo se asignó originalmente
 
 ### Tabla: `sesiones_oc`
 Maneja las OCs seleccionadas durante la sesión de trabajo.
@@ -199,6 +245,26 @@ Sistema de autenticación y control de roles:
 - Estado del usuario (activo/inactivo)
 - Información de contacto y timestamps
 - Control de último acceso
+
+### Tabla: `auditoria_retiros` *(Nueva)*
+Sistema completo de auditoría y trazabilidad:
+
+- `retiro_id` - Registro relacionado (puede ser NULL)
+- `usuario_id` - Usuario que realizó la acción
+- `accion` - Tipo de acción (login, registro, consulta, etc.)
+- `detalles` - Información adicional de la acción
+- `orden_servicio` - OC involucrada (si aplica)
+- `ip_address` - IP desde donde se realizó la acción
+- `user_agent` - Información del navegador
+- `fecha_accion` - Timestamp exacto de la acción
+
+**Tipos de acciones registradas:**
+- **Login/Logout:** Control de sesiones
+- **Búsqueda:** Intentos de acceso a OCs
+- **Registro:** Registros exitosos de retiros
+- **Consulta:** Visualización de registros
+- **Reasignación:** Cambios de técnico responsable
+- **Reapertura:** Liberación de OCs para re-registro
 
 ---
 
@@ -300,9 +366,10 @@ Logout:        http://localhost/form%20gaselag%20retiros/logout.php
 
 ### URLs de Gestión *(Solo Administrador)*
 ```
-Usuarios:      http://localhost/form%20gaselag%20retiros/pages/gestion_usuarios.php
-Casos Críticos: http://localhost/form%20gaselag%20retiros/pages/reporte_imposibilidad.php
-Exportar:      http://localhost/form%20gaselag%20retiros/pages/exportar_excel.php
+Gestión Retiros: http://localhost/form%20gaselag%20retiros/pages/gestion_retiros.php
+Usuarios:        http://localhost/form%20gaselag%20retiros/pages/gestion_usuarios.php
+Casos Críticos:  http://localhost/form%20gaselag%20retiros/pages/reporte_imposibilidad.php
+Exportar:        http://localhost/form%20gaselag%20retiros/pages/exportar_excel.php
 ```
 
 ### URLs Operativas *(Todos los usuarios)*

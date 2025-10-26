@@ -11,10 +11,13 @@ $filtro_fecha_hasta = isset($_GET['filtro_fecha_hasta']) ? $_GET['filtro_fecha_h
 $filtro_retirado = isset($_GET['filtro_retirado']) ? $_GET['filtro_retirado'] : '';
 $filtro_problematicos = isset($_GET['filtro_problematicos']) ? $_GET['filtro_problematicos'] : '';
 
+// Obtener usuario actual para filtrado
+$currentUser = getCurrentUser();
+
 // Construir consulta
 try {
     $pdo = getConnection();
-    
+
     $sql = "SELECT
                 r.*,
                 o.cliente,
@@ -24,6 +27,8 @@ try {
                 o.marca_medidor,
                 o.modelo_medidor,
                 o.programacion_dia_retiro,
+                u.nombre_completo as registrado_por,
+                u.username as username_registrado,
                 CASE
                     WHEN r.medidor_retirado = 'NO'
                          AND (r.foto_imposibilidad IS NULL OR r.foto_imposibilidad = '')
@@ -41,9 +46,33 @@ try {
                 END as es_caso_problematico
             FROM retiros_medidores r
             INNER JOIN ordenes_servicio o ON r.orden_servicio_id = o.id
+            LEFT JOIN usuarios u ON r.usuario_id = u.id
             WHERE 1=1";
-    
-    $params = [];
+
+    // ===== FILTRO POR USUARIO (AISLAMIENTO DE DATOS) =====
+    // Verificar si existe la columna usuario_id
+    $userColumnExists = false;
+    try {
+        $checkColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'usuario_id'";
+        $userColumnExists = $pdo->query($checkColumnQuery)->rowCount() > 0;
+    } catch (Exception $e) {
+        // Si no se puede verificar, asumir que no existe
+        $userColumnExists = false;
+    }
+
+    // Si es técnico y existe la columna usuario_id, filtrar por sus registros
+    if (isUser() && $userColumnExists) {
+        $sql .= " AND r.usuario_id = ?";
+        $params[] = $_SESSION['user_id'];
+
+        // Registrar consulta en auditoría
+        logAudit(null, $_SESSION['user_id'], 'consulta_registros',
+                'Consulta de registros propios desde consultar_retiros.php');
+    } else if (isAdmin()) {
+        // Admin ve todos los registros, registrar consulta general
+        logAudit(null, $_SESSION['user_id'], 'consulta_registros',
+                'Consulta de todos los registros (admin) desde consultar_retiros.php');
+    }
     
     if (!empty($filtro_oc)) {
         $sql .= " AND r.orden_servicio LIKE ?";
@@ -242,12 +271,16 @@ try {
                             </a>
                         </div>
                         <div class="col-md-6 text-end">
-                            <a href="reporte_imposibilidad.php" class="btn btn-danger me-2">
-                                <i class="bi bi-exclamation-triangle"></i> Ver Críticos
-                            </a>
-                            <button type="button" class="btn btn-success" onclick="exportarExcel()">
-                                <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
-                            </button>
+                            <?php if (isAdmin()): ?>
+                                <a href="reporte_imposibilidad.php" class="btn btn-danger me-2">
+                                    <i class="bi bi-exclamation-triangle"></i> Ver Críticos
+                                </a>
+                            <?php endif; ?>
+                            <?php if (isAdmin()): ?>
+                                <button type="button" class="btn btn-success" onclick="exportarExcel()">
+                                    <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
+                                </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </form>
@@ -257,9 +290,17 @@ try {
         <!-- Tabla de resultados -->
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0">
-                    <i class="bi bi-table text-primary"></i> Registros de Retiros (<?= count($retiros) ?>)
-                </h5>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table text-primary"></i> Registros de Retiros (<?= count($retiros) ?>)
+                    </h5>
+                    <?php if (isUser()): ?>
+                        <div class="alert alert-info py-2 mb-0" style="font-size: 0.875rem;">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Solo ves tus registros</strong> - Cada técnico ve únicamente los retiros que ha registrado
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="card-body p-0">
                 <?php if (empty($retiros)): ?>
@@ -277,7 +318,7 @@ try {
                                     <th>Cliente</th>
                                     <th>N° Serie</th>
                                     <th>Medidor Retirado</th>
-                                    <th>Técnico</th>
+                                    <th>Registrado por</th>
                                     <th class="text-center">
                                         <i class="bi bi-camera text-info" title="Registro Fotográfico"></i>
                                         <br>
@@ -306,7 +347,20 @@ try {
                                                 <span class="badge bg-warning text-dark">NO</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td><?= htmlspecialchars($retiro['tecnico_responsable']) ?></td>
+                                        <td>
+                                            <?php if (!empty($retiro['registrado_por'])): ?>
+                                                <div>
+                                                    <strong><?= htmlspecialchars($retiro['registrado_por']) ?></strong>
+                                                    <?php if (!empty($retiro['username_registrado'])): ?>
+                                                        <br><small class="text-muted">@<?= htmlspecialchars($retiro['username_registrado']) ?></small>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php else: ?>
+                                                <span class="text-muted">
+                                                    <i class="bi bi-question-circle"></i> No asignado
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td class="text-center">
                                             <?php if ($retiro['tipo_problema'] == 1): ?>
                                                 <!-- Imposibilidad sin foto (PROBLEMA CRÍTICO) -->
