@@ -181,6 +181,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Obtener ID del registro insertado
         $registroId = $pdo->lastInsertId();
 
+        // Marcar evidencia como obligatoria si corresponde y establecer fecha límite
+        if ($tipo_imposibilidad_id) {
+            marcarEvidenciaObligatoria($registroId, $tipo_imposibilidad_id);
+        }
+
         // Registrar en auditoría
         $tipoInfo = $tipo_imposibilidad_id ? getTipoImposibilidad($tipo_imposibilidad_id) : null;
         $tipoDescripcion = $tipoInfo ? $tipoInfo['descripcion'] : 'Sin especificar';
@@ -862,18 +867,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                // Si hay foto, verificar que sea de imposibilidad de lectura o similar
+                // La foto NO es obligatoria en el momento del registro
+                // Se puede adjuntar posteriormente dentro de las 6 horas
                 const fotoInput = document.getElementById('foto_imposibilidad');
                 if (fotoInput.files && fotoInput.files.length > 0) {
                     const tipoInfo = tipoImposibilidad.options[tipoImposibilidad.selectedIndex];
                     const descripcionTipo = tipoInfo.text.toLowerCase();
-
-                    // Si el tipo sugiere que necesita evidencia fotográfica
-                    if (descripcionTipo.includes('lectura') ||
-                        descripcionTipo.includes('dañado') ||
-                        descripcionTipo.includes('averiado')) {
-                        console.log('Foto validada para tipo:', descripcionTipo);
-                    }
+                    console.log('Foto adjuntada para tipo:', descripcionTipo);
                 }
             }
 

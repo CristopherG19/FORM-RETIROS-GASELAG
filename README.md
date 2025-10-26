@@ -9,6 +9,8 @@ Sistema web profesional para la gestión y registro de retiros de medidores de a
 - ✅ **Validación anti-duplicación** - Una OC solo se registra una vez
 - ✅ **Tipos de Imposibilidad** - Catálogo estructurado de motivos de no retiro
 - ✅ **Gestión de Imposibilidad** - Admin puede agregar/editar tipos de casos
+- ✅ **Control de evidencia fotográfica** - Sistema de 6 horas para adjuntar evidencia
+- ✅ **Sistema de sanciones** - Control de cumplimiento de evidencia
 - ✅ **Control de acceso** basado en permisos por rol
 - ✅ **Sistema de auditoría completo** - Trazabilidad total de acciones
 - ✅ **Reasignación de registros** - Admin puede cambiar técnico responsable
@@ -119,6 +121,7 @@ Por defecto usa:
 - ✅ Importar datos desde Excel
 - ✅ **Gestión de retiros** (ver todos, reasignar, reabrir)
 - ✅ **Gestión de tipos de imposibilidad** (crear, editar, activar/desactivar)
+- ✅ **Gestión de evidencias** (control de evidencia fotográfica y sanciones)
 - ✅ **Sistema de auditoría** (ver todas las acciones)
 - ✅ Consultar todos los registros (de todos los técnicos)
 - ✅ Ver casos críticos (sin evidencia fotográfica)
@@ -126,6 +129,7 @@ Por defecto usa:
 - ✅ **Gestión de usuarios** (crear, activar/desactivar, eliminar)
 - ✅ **Reasignación de registros** entre técnicos
 - ✅ **Reapertura de OCs** para nuevo registro
+- ✅ **Aplicar sanciones** por incumplimiento de evidencia
 
 ### 👨‍🔧 Técnico
 **Acceso limitado con aislamiento de datos:**
@@ -133,12 +137,15 @@ Por defecto usa:
 - ✅ **Solo ve sus propios registros** (aislamiento de datos)
 - ✅ **Validación anti-duplicación** (no puede registrar OC ya procesada)
 - ✅ **Auto-asignación** (el sistema asigna automáticamente el usuario)
+- ✅ **Control de evidencia fotográfica** (ventana de 6 horas para adjuntar)
+- ✅ **Editar sus propios registros** (dentro del tiempo límite)
 - ✅ Registrar retiros de medidores
 - ✅ Consultar **solo sus propios registros**
 - ❌ Ver casos críticos (bloqueado)
 - ❌ Exportar datos (bloqueado)
 - ❌ Gestión de usuarios (bloqueado)
 - ❌ Ver registros de otros técnicos (bloqueado)
+- ❌ Aplicar sanciones (bloqueado)
 
 ---
 
@@ -229,14 +236,23 @@ Por defecto usa:
 6. Ver estadísticas de uso de cada tipo
 ```
 
-### ⚠️ 8. Casos Críticos *(Solo Administrador)*
+### ⚙️ 8. Gestión de Evidencias *(Solo Administrador)*
+```
+1. Menu → "Gestión de Evidencias"
+2. Ver registros pendientes de evidencia fotográfica
+3. Aplicar sanciones por incumplimiento de evidencia
+4. Monitorear cumplimiento de evidencia por técnico
+5. Ver estadísticas de evidencia completada vs pendiente
+```
+
+### ⚠️ 9. Casos Críticos *(Solo Administrador)*
 ```
 1. Menu → "Casos Críticos"
 2. Identificar registros no retirados sin evidencia fotográfica
 3. Gestionar seguimiento de casos problemáticos
 ```
 
-### 👥 9. Gestión de Usuarios *(Solo Administrador)*
+### 👥 10. Gestión de Usuarios *(Solo Administrador)*
 ```
 1. Menu → "Gestión de Usuarios"
 2. Crear nuevos usuarios (Admin/Técnico)
@@ -244,7 +260,7 @@ Por defecto usa:
 4. Asignar roles y permisos
 ```
 
-### 📤 10. Exportar Datos *(Solo Administrador)*
+### 📤 11. Exportar Datos *(Solo Administrador)*
 ```
 1. Menu → "Exportar Datos"
 2. Aplicar filtros según necesites
@@ -273,6 +289,17 @@ Registra cada retiro realizado:
 - `usuario_reasignado_por` - Admin que hizo reasignación
 - `fecha_reasignacion` - Cuándo se reasignó
 - `fecha_asignacion` - Cuándo se asignó originalmente
+
+**Nuevos campos para control de evidencia fotográfica:**
+- `tipo_imposibilidad_id` - Referencia al tipo de imposibilidad
+- `detalles_imposibilidad` - Detalles adicionales del motivo
+- `evidencia_obligatoria` - SI/NO si requiere evidencia fotográfica
+- `fecha_limite_evidencia` - Fecha límite para adjuntar evidencia (6 horas)
+- `evidencia_completa` - SI/NO si ya se adjuntó la evidencia
+- `sancion_aplicada` - SI/NO si se aplicó sanción por incumplimiento
+- `motivo_sancion` - Razón de la sanción aplicada
+- `fecha_sancion` - Cuándo se aplicó la sanción
+- `admin_sancion_id` - Admin que aplicó la sanción
 
 ### Tabla: `sesiones_oc`
 Maneja las OCs seleccionadas durante la sesión de trabajo.
@@ -423,6 +450,7 @@ Logout:        http://localhost/form%20gaselag%20retiros/logout.php
 ```
 Gestión Retiros:      http://localhost/form%20gaselag%20retiros/pages/gestion_retiros.php
 Tipos Imposibilidad:  http://localhost/form%20gaselag%20retiros/pages/gestion_imposibilidad.php
+Gestión Evidencias:   http://localhost/form%20gaselag%20retiros/pages/gestion_evidencias.php
 Usuarios:             http://localhost/form%20gaselag%20retiros/pages/gestion_usuarios.php
 Casos Críticos:       http://localhost/form%20gaselag%20retiros/pages/reporte_imposibilidad.php
 Exportar:             http://localhost/form%20gaselag%20retiros/pages/exportar_excel.php

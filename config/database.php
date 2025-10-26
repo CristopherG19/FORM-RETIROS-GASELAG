@@ -804,5 +804,327 @@ function getEstadisticasImposibilidadFromText($userId = null) {
         return [];
     }
 }
+
+// ===== SISTEMA DE CONTROL DE EVIDENCIA FOTOGRÁFICA =====
+
+// Función para verificar si un tipo de imposibilidad requiere evidencia obligatoria
+function requiereEvidenciaFotografica($tipoImposibilidadId) {
+    if (!$tipoImposibilidadId) {
+        return false;
+    }
+
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT categoria FROM tipos_imposibilidad WHERE id = ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(1, $tipoImposibilidadId);
+        $stmt->execute();
+
+        $tipo = $stmt->fetch();
+        return $tipo && in_array($tipo['categoria'], ['medidor', 'seguridad']);
+    } catch (PDOException $e) {
+        error_log("Error al verificar evidencia requerida: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Función para marcar evidencia como obligatoria (al registrar)
+function marcarEvidenciaObligatoria($retiroId, $tipoImposibilidadId) {
+    $pdo = getConnection();
+
+    try {
+        $requiereEvidencia = requiereEvidenciaFotografica($tipoImposibilidadId) ? 'SI' : 'NO';
+
+        // Si requiere evidencia, establecer fecha límite (6 horas desde ahora)
+        $fechaLimite = null;
+        if ($requiereEvidencia === 'SI') {
+            $fechaLimite = date('Y-m-d H:i:s', strtotime('+6 hours'));
+        }
+
+        $sql = "UPDATE retiros_medidores
+                SET evidencia_obligatoria = ?, fecha_limite_evidencia = ?, evidencia_completa = 'NO'
+                WHERE id = ?";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$requiereEvidencia, $fechaLimite, $retiroId]);
+
+        // Registrar en auditoría
+        logAudit($retiroId, $_SESSION['user_id'], 'evidencia_requerida',
+                "Evidencia marcada como $requiereEvidencia - Límite: " . ($fechaLimite ?: 'No aplica'),
+                null);
+
+        return true;
+    } catch (PDOException $e) {
+        error_log("Error al marcar evidencia obligatoria: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Función para verificar si aún está dentro del tiempo límite para adjuntar evidencia
+function puedeAdjuntarEvidencia($retiroId) {
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT evidencia_obligatoria, fecha_limite_evidencia, evidencia_completa
+                FROM retiros_medidores
+                WHERE id = ?";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(1, $retiroId);
+        $stmt->execute();
+
+        $evidencia = $stmt->fetch();
+
+        if (!$evidencia || $evidencia['evidencia_obligatoria'] === 'NO') {
+            return true; // No requiere evidencia
+        }
+
+        if ($evidencia['evidencia_completa'] === 'SI') {
+            return false; // Ya completada
+        }
+
+        if (!$evidencia['fecha_limite_evidencia']) {
+            return true; // Sin límite de tiempo
+        }
+
+        $fechaLimite = strtotime($evidencia['fecha_limite_evidencia']);
+        $ahora = time();
+
+        return $ahora <= $fechaLimite;
+    } catch (PDOException $e) {
+        error_log("Error al verificar tiempo para evidencia: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Función para calcular tiempo restante para adjuntar evidencia
+function getTiempoRestanteEvidencia($retiroId) {
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT fecha_limite_evidencia, evidencia_completa
+                FROM retiros_medidores
+                WHERE id = ?";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(1, $retiroId);
+        $stmt->execute();
+
+        $evidencia = $stmt->fetch();
+
+        if (!$evidencia || !$evidencia['fecha_limite_evidencia']) {
+            return null;
+        }
+
+        if ($evidencia['evidencia_completa'] === 'SI') {
+            return 'completada';
+        }
+
+        $fechaLimite = strtotime($evidencia['fecha_limite_evidencia']);
+        $ahora = time();
+        $tiempoRestante = $fechaLimite - $ahora;
+
+        if ($tiempoRestante <= 0) {
+            return 'vencida';
+        }
+
+        $horas = floor($tiempoRestante / 3600);
+        $minutos = floor(($tiempoRestante % 3600) / 60);
+
+        return "{$horas}h {$minutos}m";
+    } catch (PDOException $e) {
+        error_log("Error al calcular tiempo restante: " . $e->getMessage());
+        return null;
+    }
+}
+
+// Función para adjuntar evidencia fotográfica a un registro existente
+function adjuntarEvidenciaFotografica($retiroId, $fotoPath, $userId) {
+    if (!puedeAdjuntarEvidencia($retiroId)) {
+        return ['success' => false, 'message' => 'Tiempo límite para adjuntar evidencia ha expirado'];
+    }
+
+    $pdo = getConnection();
+
+    try {
+        $pdo->beginTransaction();
+
+        // Actualizar el registro con la evidencia
+        $sql = "UPDATE retiros_medidores
+                SET foto_imposibilidad = ?, tiene_foto = 'SI', evidencia_completa = 'SI'
+                WHERE id = ?";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$fotoPath, $retiroId]);
+
+        // Registrar en auditoría
+        logAudit($retiroId, $userId, 'evidencia_adjuntada',
+                "Evidencia fotográfica adjuntada: $fotoPath",
+                null);
+
+        $pdo->commit();
+        return ['success' => true, 'message' => 'Evidencia adjuntada correctamente'];
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        error_log("Error al adjuntar evidencia: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al adjuntar evidencia'];
+    }
+}
+
+// Función para obtener registros que requieren evidencia (para admin)
+function getRegistrosPendientesEvidencia($userId = null) {
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT r.*, o.cliente, o.direccion, u.nombre_completo as tecnico_responsable,
+                       u.username as username_tecnico,
+                       ti.descripcion as tipo_imposibilidad,
+                       DATEDIFF(NOW(), r.fecha_registro) as dias_transcurridos
+                FROM retiros_medidores r
+                INNER JOIN ordenes_servicio o ON r.orden_servicio_id = o.id
+                LEFT JOIN usuarios u ON r.usuario_id = u.id
+                LEFT JOIN tipos_imposibilidad ti ON r.tipo_imposibilidad_id = ti.id
+                WHERE r.evidencia_obligatoria = 'SI'
+                AND r.evidencia_completa = 'NO'
+                AND r.fecha_limite_evidencia < NOW()";
+
+        $params = [];
+
+        // Si es técnico, solo ver sus propios registros
+        if (isUser()) {
+            $sql .= " AND r.usuario_id = ?";
+            $params[] = $_SESSION['user_id'];
+        }
+
+        $sql .= " ORDER BY r.fecha_limite_evidencia ASC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        error_log("Error al obtener registros pendientes de evidencia: " . $e->getMessage());
+        return [];
+    }
+}
+
+// Función para aplicar sanción por no completar evidencia (solo admin)
+function aplicarSancionEvidencia($retiroId, $motivo, $adminUserId) {
+    if (!isAdmin()) {
+        return false;
+    }
+
+    $pdo = getConnection();
+
+    try {
+        $pdo->beginTransaction();
+
+        // Aplicar sanción
+        $sql = "UPDATE retiros_medidores
+                SET sancion_aplicada = 'SI', motivo_sancion = ?, fecha_sancion = NOW(),
+                    admin_sancion_id = ?
+                WHERE id = ?";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$motivo, $adminUserId, $retiroId]);
+
+        // Obtener información del registro para auditoría
+        $retiroInfo = getRetiroInfo($retiroId);
+
+        // Registrar en auditoría
+        logAudit($retiroId, $adminUserId, 'sancion_aplicada',
+                "Sanción aplicada: $motivo - Técnico: {$retiroInfo['tecnico_responsable']}",
+                $retiroInfo['orden_servicio']);
+
+        $pdo->commit();
+        return true;
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        error_log("Error al aplicar sanción: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Función para obtener registros con sanciones aplicadas
+function getRegistrosConSanciones($userId = null, $fechaDesde = null, $fechaHasta = null) {
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT r.*, o.cliente, o.direccion,
+                       u.nombre_completo as tecnico_responsable,
+                       u.username as username_tecnico,
+                       admin_u.nombre_completo as admin_sancion,
+                       r.motivo_sancion,
+                       r.fecha_sancion
+                FROM retiros_medidores r
+                INNER JOIN ordenes_servicio o ON r.orden_servicio_id = o.id
+                LEFT JOIN usuarios u ON r.usuario_id = u.id
+                LEFT JOIN usuarios admin_u ON r.admin_sancion_id = admin_u.id
+                WHERE r.sancion_aplicada = 'SI'";
+
+        $params = [];
+
+        if ($userId) {
+            $sql .= " AND r.usuario_id = ?";
+            $params[] = $userId;
+        }
+
+        if ($fechaDesde) {
+            $sql .= " AND DATE(r.fecha_sancion) >= ?";
+            $params[] = $fechaDesde;
+        }
+
+        if ($fechaHasta) {
+            $sql .= " AND DATE(r.fecha_sancion) <= ?";
+            $params[] = $fechaHasta;
+        }
+
+        $sql .= " ORDER BY r.fecha_sancion DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        error_log("Error al obtener registros con sanciones: " . $e->getMessage());
+        return [];
+    }
+}
+
+// Función para obtener estadísticas de cumplimiento de evidencia
+function getEstadisticasCumplimientoEvidencia($userId = null) {
+    $pdo = getConnection();
+
+    try {
+        $sql = "SELECT
+                    COUNT(*) as total_no_retirados,
+                    COUNT(CASE WHEN evidencia_obligatoria = 'SI' THEN 1 END) as requiere_evidencia,
+                    COUNT(CASE WHEN evidencia_completa = 'SI' THEN 1 END) as evidencia_completa,
+                    COUNT(CASE WHEN evidencia_obligatoria = 'SI' AND evidencia_completa = 'NO' AND fecha_limite_evidencia < NOW() THEN 1 END) as evidencia_vencida,
+                    COUNT(CASE WHEN sancion_aplicada = 'SI' THEN 1 END) as sanciones_aplicadas,
+                    ROUND(
+                        (COUNT(CASE WHEN evidencia_completa = 'SI' THEN 1 END) /
+                         NULLIF(COUNT(CASE WHEN evidencia_obligatoria = 'SI' THEN 1 END), 0)) * 100, 2
+                    ) as porcentaje_cumplimiento
+                FROM retiros_medidores
+                WHERE medidor_retirado = 'NO'";
+
+        $params = [];
+
+        if (isUser()) {
+            $sql .= " AND usuario_id = ?";
+            $params[] = $_SESSION['user_id'];
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetch();
+    } catch (PDOException $e) {
+        error_log("Error al obtener estadísticas de cumplimiento: " . $e->getMessage());
+        return null;
+    }
+}
 ?>
 

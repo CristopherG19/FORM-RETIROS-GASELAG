@@ -6,6 +6,10 @@ requireRole(['admin', 'user']);
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+// Manejar mensajes de éxito y error
+$successMessage = $_GET['success'] ?? '';
+$errorMessage = $_GET['error'] ?? '';
+
 try {
     $pdo = getConnection();
     $stmt = $pdo->prepare("
@@ -18,11 +22,15 @@ try {
             ti.categoria as tipo_imposibilidad_categoria,
             ti.codigo as tipo_imposibilidad_codigo,
             u.nombre_completo as registrado_por,
-            u.username as username_registrado
+            u.username as username_registrado,
+            admin_u.nombre_completo as admin_sancion,
+            r.motivo_sancion,
+            r.fecha_sancion
         FROM retiros_medidores r
         INNER JOIN ordenes_servicio o ON r.orden_servicio_id = o.id
         LEFT JOIN tipos_imposibilidad ti ON r.tipo_imposibilidad_id = ti.id
         LEFT JOIN usuarios u ON r.usuario_id = u.id
+        LEFT JOIN usuarios admin_u ON r.admin_sancion_id = admin_u.id
         WHERE r.id = ?
     ");
     $stmt->execute([$id]);
@@ -77,37 +85,57 @@ try {
     </div>
 </div>
 
-<!-- ALERTA PARA REGISTROS NO RETIRADOS -->
-<?php if ($data['medidor_retirado'] === 'NO' && (empty($data['foto_imposibilidad']))): ?>
-    <div class="alert alert-danger border-0 shadow-sm mb-4" role="alert">
+<!-- ALERTA PARA REGISTROS NO RETIRADOS CON CONTROL DE TIEMPO -->
+<?php
+$tiempoRestante = getTiempoRestanteEvidencia($data['retiro_id']);
+$evidenciaPendiente = $data['evidencia_obligatoria'] === 'SI' && $data['evidencia_completa'] === 'NO';
+?>
+
+<?php if ($data['medidor_retirado'] === 'NO' && $evidenciaPendiente): ?>
+    <div class="alert <?= ($tiempoRestante === 'vencida') ? 'alert-danger' : 'alert-warning' ?> border-0 shadow-sm mb-4" role="alert">
         <div class="d-flex align-items-center">
             <div class="flex-shrink-0">
-                <i class="bi bi-exclamation-triangle-fill" style="font-size: 2rem;"></i>
+                <i class="bi bi-<?= ($tiempoRestante === 'vencida') ? 'exclamation-triangle' : 'clock' ?>-fill" style="font-size: 2rem;"></i>
             </div>
             <div class="flex-grow-1 ms-3">
                 <h5 class="alert-heading mb-2">
-                    <i class="bi bi-camera"></i> REQUIERE EVIDENCIA FOTOGRÁFICA
+                    <i class="bi bi-camera"></i>
+                    <?= ($tiempoRestante === 'vencida') ? 'EVIDENCIA VENCIDA' : 'REQUIERE EVIDENCIA FOTOGRÁFICA' ?>
                 </h5>
                 <p class="mb-2">
-                    <strong>❌ REGISTRO CRÍTICO - SIN EVIDENCIA FOTOGRÁFICA</strong>
+                    <strong>
+                        <?php if ($tiempoRestante === 'vencida'): ?>
+                            ❌ TIEMPO EXPIRADO - SANCION PENDIENTE
+                        <?php else: ?>
+                            ⏰ TIEMPO RESTANTE: <?= $tiempoRestante ?>
+                        <?php endif; ?>
+                    </strong>
                 </p>
-                <?php if ($data['visor_imposibilidad_lectura'] === 'SI'): ?>
-                    <p class="mb-2">
-                        Este registro indica imposibilidad de lectura pero no tiene foto de sustento.
-                        Es necesario contactar al técnico para que adjunte la evidencia fotográfica.
+                <p class="mb-2">
+                    <?php if ($data['tipo_imposibilidad_descripcion']): ?>
+                        <strong>Tipo de Imposibilidad:</strong> <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?>
+                    <?php else: ?>
+                        Este registro requiere evidencia fotográfica pero no tiene tipo de imposibilidad especificado.
+                    <?php endif; ?>
+                </p>
+                <?php if ($tiempoRestante !== 'vencida'): ?>
+                    <hr>
+                    <p class="mb-0">
+                        <strong>Acción requerida:</strong> Adjuntar evidencia fotográfica antes del vencimiento
+                        <br><small class="text-muted">Puede editar este registro para agregar la foto</small>
                     </p>
                 <?php else: ?>
-                    <p class="mb-2">
-                        Este registro no especifica el motivo del no retiro y no tiene evidencia fotográfica.
-                        Es necesario contactar al técnico para que proporcione la evidencia correspondiente.
+                    <hr>
+                    <p class="mb-0">
+                        <strong>Estado:</strong> Tiempo límite expirado - Se aplicará sanción al técnico
+                        <?php if ($data['sancion_aplicada'] === 'SI'): ?>
+                            <br><span class="badge bg-danger">SANCIÓN APLICADA</span>
+                            <?php if ($data['motivo_sancion']): ?>
+                                <br><small class="text-muted">Motivo: <?= htmlspecialchars($data['motivo_sancion']) ?></small>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </p>
                 <?php endif; ?>
-                <hr>
-                <p class="mb-0">
-                    <strong>Acción requerida:</strong> Solicitar al técnico
-                    <span class="badge bg-dark"> <?= htmlspecialchars($data['tecnico_responsable']) ?> </span>
-                    que proporcione evidencia fotográfica del estado del medidor.
-                </p>
             </div>
         </div>
     </div>
@@ -122,8 +150,8 @@ try {
                     <i class="bi bi-check-circle"></i> REGISTRO COMPLETO
                 </h5>
                 <p class="mb-0">
-                    <?php if ($data['visor_imposibilidad_lectura'] === 'SI'): ?>
-                        <strong>✅ Imposibilidad de lectura con evidencia fotográfica</strong><br>
+                    <?php if ($data['tipo_imposibilidad_descripcion']): ?>
+                        <strong>✅ <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?> con evidencia fotográfica</strong><br>
                         Este registro está correctamente documentado.
                     <?php else: ?>
                         <strong>✅ No retiro con evidencia fotográfica</strong><br>
@@ -132,6 +160,25 @@ try {
                 </p>
             </div>
         </div>
+    </div>
+<?php endif; ?>
+
+<!-- Mensajes de éxito y error -->
+<?php if ($successMessage): ?>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>
+        <?php if ($successMessage === 'evidencia_adjuntada'): ?>
+            Evidencia fotográfica adjuntada correctamente
+        <?php endif; ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+
+<?php if ($errorMessage): ?>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <?php echo htmlspecialchars(urldecode($errorMessage)); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 <?php endif; ?>
 
@@ -321,11 +368,66 @@ try {
                 <i class="bi bi-camera text-primary"></i> Foto de Imposibilidad
             </h6>
             <div class="text-center">
-                <img src="../<?= htmlspecialchars($data['foto_imposibilidad']) ?>" 
-                     class="img-fluid rounded shadow-sm border" 
+                <img src="../<?= htmlspecialchars($data['foto_imposibilidad']) ?>"
+                     class="img-fluid rounded shadow-sm border"
                      alt="Foto de imposibilidad"
                      style="max-height: 400px; max-width: 100%;">
             </div>
         </div>
     </div>
 <?php endif; ?>
+
+<!-- Botón de Editar (para técnicos dentro del tiempo límite) -->
+<?php if (isUser() && $data['usuario_id'] === $_SESSION['user_id'] && puedeAdjuntarEvidencia($data['retiro_id'])): ?>
+    <div class="card border-0 bg-light">
+        <div class="card-body text-center">
+            <h6 class="fw-bold mb-3">
+                <i class="bi bi-pencil text-primary"></i> Editar Registro
+            </h6>
+            <p class="text-muted mb-3">Puede adjuntar evidencia fotográfica si está dentro del tiempo límite</p>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editEvidenceModal">
+                <i class="bi bi-camera me-2"></i>Adjuntar Evidencia
+            </button>
+        </div>
+    </div>
+<?php endif; ?>
+
+<!-- Modal para adjuntar evidencia -->
+<div class="modal fade" id="editEvidenceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-camera me-2"></i>Adjuntar Evidencia Fotográfica
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="adjuntar_evidencia.php" enctype="multipart/form-data">
+                <input type="hidden" name="retiro_id" value="<?php echo $data['retiro_id']; ?>">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <strong>Información:</strong><br>
+                        Tipo de Imposibilidad: <strong><?php echo htmlspecialchars($data['tipo_imposibilidad_descripcion'] ?: 'No especificado'); ?></strong><br>
+                        <?php if ($data['detalles_imposibilidad']): ?>
+                            Detalles: <?php echo htmlspecialchars($data['detalles_imposibilidad']); ?><br>
+                        <?php endif; ?>
+                        Tiempo restante: <strong><?php echo htmlspecialchars(getTiempoRestanteEvidencia($data['retiro_id']) ?: 'Sin límite'); ?></strong>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="foto_evidencia" class="form-label">
+                            <i class="bi bi-camera"></i> Evidencia Fotográfica *
+                        </label>
+                        <input type="file" class="form-control" id="foto_evidencia" name="foto_evidencia"
+                               accept="image/*" required>
+                        <div class="form-text">Adjunte una foto clara del medidor y la situación</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Adjuntar Evidencia</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

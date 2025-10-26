@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS tipos_imposibilidad (
     INDEX idx_activo (activo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insertar tipos de imposibilidad predefinidos
+-- Insertar tipos de imposibilidad predefinidos con configuración de evidencia
 INSERT INTO tipos_imposibilidad (codigo, descripcion, categoria) VALUES
 ('NIPLE', 'Se encontró conexión con niple', 'medidor'),
 ('OPOSICION', 'Usuario se opuso al retiro', 'cliente'),
@@ -160,12 +160,28 @@ INSERT INTO tipos_imposibilidad (codigo, descripcion, categoria) VALUES
 ('NO_LOCALIZADO', 'Medidor no localizado en la dirección', 'acceso'),
 ('OTROS', 'Otros motivos', 'otros');
 
--- Modificar tabla de retiros para incluir tipo de imposibilidad
+-- Actualizar configuración de evidencia obligatoria para tipos específicos
+UPDATE tipos_imposibilidad SET descripcion = CONCAT(descripcion, ' (Requiere Evidencia)') WHERE categoria IN ('medidor', 'seguridad');
+UPDATE tipos_imposibilidad SET descripcion = CONCAT(descripcion, ' (Opcional)') WHERE categoria IN ('acceso', 'cliente', 'otros');
+
+-- Modificar tabla de retiros para incluir tipo de imposibilidad y control de evidencia
 ALTER TABLE retiros_medidores
 ADD COLUMN tipo_imposibilidad_id INT NULL,
 ADD COLUMN detalles_imposibilidad TEXT NULL,
+ADD COLUMN evidencia_obligatoria ENUM('SI', 'NO') NOT NULL DEFAULT 'NO',
+ADD COLUMN fecha_limite_evidencia TIMESTAMP NULL,
+ADD COLUMN evidencia_completa ENUM('SI', 'NO') NOT NULL DEFAULT 'NO',
+ADD COLUMN sancion_aplicada ENUM('SI', 'NO') NOT NULL DEFAULT 'NO',
+ADD COLUMN motivo_sancion TEXT NULL,
+ADD COLUMN fecha_sancion TIMESTAMP NULL,
+ADD COLUMN admin_sancion_id INT NULL,
 ADD FOREIGN KEY (tipo_imposibilidad_id) REFERENCES tipos_imposibilidad(id),
-ADD INDEX idx_tipo_imposibilidad (tipo_imposibilidad_id);
+ADD FOREIGN KEY (admin_sancion_id) REFERENCES usuarios(id),
+ADD INDEX idx_tipo_imposibilidad (tipo_imposibilidad_id),
+ADD INDEX idx_evidencia_obligatoria (evidencia_obligatoria),
+ADD INDEX idx_fecha_limite_evidencia (fecha_limite_evidencia),
+ADD INDEX idx_evidencia_completa (evidencia_completa),
+ADD INDEX idx_sancion_aplicada (sancion_aplicada);
 
 -- Tabla de usuarios para el sistema de autenticación
 CREATE TABLE IF NOT EXISTS usuarios (
