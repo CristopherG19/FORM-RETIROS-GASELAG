@@ -4,12 +4,15 @@ Sistema web profesional para la gestión y registro de retiros de medidores de a
 
 ## 📋 Características
 
-- ✅ **Importación masiva** de órdenes de servicio desde Excel
+- ✅ **Sistema de Autenticación** con roles de usuario (Admin/Técnico)
+- ✅ **Control de acceso** basado en permisos por rol
+- ✅ **Importación masiva** de órdenes de servicio desde Excel *(Solo Admin)*
 - ✅ **Búsqueda rápida** por código OC
 - ✅ **Formularios inteligentes** que se adaptan según el estado del retiro
 - ✅ **Gestión de fotos** con nomenclatura automática
 - ✅ **Consulta avanzada** con múltiples filtros
-- ✅ **Exportación a CSV** compatible con Excel
+- ✅ **Exportación a CSV** compatible con Excel *(Solo Admin)*
+- ✅ **Gestión de usuarios** para administradores *(Solo Admin)*
 - ✅ **Interfaz moderna** con Bootstrap 5
 - ✅ **Responsive** (funciona en tablets y móviles)
 
@@ -42,8 +45,27 @@ Opción B: http://localhost/form%20gaselag%20retiros/instalar.php
 ### 3. Seguir el Instalador
 El instalador automático:
 - ✅ Crea la base de datos `gaselag_retiros`
-- ✅ Crea las 3 tablas necesarias
+- ✅ Crea las 4 tablas necesarias (incluyendo usuarios)
 - ✅ Importa datos de ejemplo (opcional)
+- ✅ Crea usuarios por defecto para el sistema de autenticación
+
+### 4. Sistema de Autenticación
+Después de la instalación, el sistema crea automáticamente:
+
+**Usuarios por defecto:**
+- **Administrador:** `admin` / `password`
+- **Técnico 1:** `tecnico1` / `password`
+- **Técnico 2:** `tecnico2` / `password`
+
+**Para instalaciones existentes:**
+```
+Visita: http://localhost/form%20gaselag%20retiros/actualizar_sistema.php
+```
+
+**Acceso al sistema:**
+```
+URL de login: http://localhost/form%20gaselag%20retiros/login.php
+```
 
 ---
 
@@ -68,9 +90,39 @@ Por defecto usa:
 
 ---
 
+## 👥 Roles y Permisos
+
+### 🔐 Administrador
+**Acceso completo a todas las funciones:**
+- ✅ Importar datos desde Excel
+- ✅ Registrar retiros de medidores
+- ✅ Consultar todos los registros
+- ✅ Ver casos críticos (sin evidencia fotográfica)
+- ✅ Exportar datos a Excel
+- ✅ **Gestión de usuarios** (crear, activar/desactivar, eliminar)
+
+### 👨‍🔧 Técnico
+**Acceso limitado a funciones operativas:**
+- ❌ Importar datos (bloqueado)
+- ✅ Registrar retiros de medidores
+- ✅ Consultar registros propios y del equipo
+- ❌ Ver casos críticos (bloqueado)
+- ❌ Exportar datos (bloqueado)
+- ❌ Gestión de usuarios (bloqueado)
+
+---
+
 ## 📖 Guía de Uso
 
-### 1. Importar Datos
+### 🔐 1. Acceso al Sistema
+```
+1. Abrir: http://localhost/form%20gaselag%20retiros/login.php
+2. Ingresar usuario y contraseña
+3. Seleccionar el rol correspondiente (Admin/Técnico)
+4. Click "Iniciar Sesión"
+```
+
+### 📊 2. Importar Datos *(Solo Administrador)*
 ```
 1. Menu → "Importar Datos"
 2. Abrir Excel con las órdenes de servicio
@@ -82,27 +134,42 @@ Por defecto usa:
 
 **Importante:** No incluir la fila de encabezados, solo los datos.
 
-### 2. Registrar Retiro
+### 🔧 3. Registrar Retiro *(Todos los usuarios)*
 ```
 1. Menu → "Registrar Retiro"
 2. Buscar por código OC (ej: OC-00001)
 3. Agregar las OCs necesarias
 4. Click "Continuar con Vista Previa"
-5. Completar formulario para cada OC:
-   - Si NO se retiró: Solo observación + foto
-   - Si SÍ se retiró: Todos los campos del formulario
+5. Completar formulario para cada OC
 6. Click "Guardar"
 ```
 
-### 3. Consultar Registros
+### 🔍 4. Consultar Registros *(Todos los usuarios)*
 ```
 1. Menu → "Consultar Registros"
-2. Aplicar filtros:
-   - Por código OC
-   - Por fecha de retiro
-   - Por estado (retirado/no retirado)
+2. Aplicar filtros opcionales
 3. Click ícono 👁️ para ver detalles
-4. Click "Exportar a Excel" para descargar CSV
+```
+### ⚠️ 5. Casos Críticos *(Solo Administrador)*
+```
+1. Menu → "Casos Críticos"
+2. Identificar registros no retirados sin evidencia fotográfica
+3. Gestionar seguimiento de casos problemáticos
+```
+
+### 👥 6. Gestión de Usuarios *(Solo Administrador)*
+```
+1. Menu → "Gestión de Usuarios"
+2. Crear nuevos usuarios (Admin/Técnico)
+3. Activar/desactivar cuentas
+4. Asignar roles y permisos
+```
+
+### 📤 7. Exportar Datos *(Solo Administrador)*
+```
+1. Menu → "Exportar Datos"
+2. Aplicar filtros según necesites
+3. Descargar reporte en formato Excel
 ```
 
 ---
@@ -123,6 +190,15 @@ Registra cada retiro realizado:
 
 ### Tabla: `sesiones_oc`
 Maneja las OCs seleccionadas durante la sesión de trabajo.
+
+### Tabla: `usuarios` *(Nueva)*
+Sistema de autenticación y control de roles:
+
+- Credenciales de usuario (username/password encriptada)
+- Roles (admin/user) con diferentes permisos
+- Estado del usuario (activo/inactivo)
+- Información de contacto y timestamps
+- Control de último acceso
 
 ---
 
@@ -214,9 +290,26 @@ form gaselag retiros/
 
 ### Desarrollo Local
 ```
+Login:         http://localhost/form%20gaselag%20retiros/login.php
 Principal:     http://localhost/form%20gaselag%20retiros/
 Instalador:    http://localhost/form%20gaselag%20retiros/instalar.php
+Actualizador:  http://localhost/form%20gaselag%20retiros/actualizar_sistema.php
 Verificador:   http://localhost/form%20gaselag%20retiros/verificar_instalacion.php
+Logout:        http://localhost/form%20gaselag%20retiros/logout.php
+```
+
+### URLs de Gestión *(Solo Administrador)*
+```
+Usuarios:      http://localhost/form%20gaselag%20retiros/pages/gestion_usuarios.php
+Casos Críticos: http://localhost/form%20gaselag%20retiros/pages/reporte_imposibilidad.php
+Exportar:      http://localhost/form%20gaselag%20retiros/pages/exportar_excel.php
+```
+
+### URLs Operativas *(Todos los usuarios)*
+```
+Buscar OC:     http://localhost/form%20gaselag%20retiros/pages/buscar_oc.php
+Consultar:     http://localhost/form%20gaselag%20retiros/pages/consultar_retiros.php
+Importar:      http://localhost/form%20gaselag%20retiros/pages/importar_datos.php *(Solo Admin)*
 ```
 
 ---
