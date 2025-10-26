@@ -71,13 +71,25 @@ function getRetirosImposibilidadSinFoto($pdo) {
     }
 }
 
-// Función para contar retiros sin evidencia fotográfica
-function countRetirosImposibilidadSinFoto($pdo) {
+// Función para contar retiros sin evidencia fotográfica (con filtro por usuario)
+function countRetirosImposibilidadSinFoto($pdo, $userId = null) {
     try {
+        // Verificar si existe la columna usuario_id
+        $checkColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'usuario_id'";
+        $userColumnExists = $pdo->query($checkColumnQuery)->rowCount() > 0;
+
         $sql = "SELECT COUNT(*) as total
                 FROM retiros_medidores r
                 WHERE r.medidor_retirado = 'NO'
                 AND (r.foto_imposibilidad IS NULL OR r.foto_imposibilidad = '')";
+
+        // Aplicar filtro por usuario si es técnico y existe la columna
+        if (isUser() && $userColumnExists) {
+            if (!$userId) {
+                $userId = $_SESSION['user_id'];
+            }
+            $sql .= " AND r.usuario_id = " . intval($userId);
+        }
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute();

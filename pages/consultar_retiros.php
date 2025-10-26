@@ -60,18 +60,29 @@ try {
         $userColumnExists = false;
     }
 
+    // DEBUG: Log para verificar el comportamiento
+    error_log("DEBUG consultar_retiros.php - Usuario: " . $currentUser['username'] . " - Rol: " . $currentUser['rol']);
+    error_log("DEBUG consultar_retiros.php - userColumnExists: " . ($userColumnExists ? 'true' : 'false'));
+    error_log("DEBUG consultar_retiros.php - userId: " . $_SESSION['user_id']);
+
     // Si es técnico y existe la columna usuario_id, filtrar por sus registros
     if (isUser() && $userColumnExists) {
         $sql .= " AND r.usuario_id = ?";
         $params[] = $_SESSION['user_id'];
 
+        error_log("DEBUG consultar_retiros.php - Filtro aplicado para técnico: usuario_id = " . $_SESSION['user_id']);
+
         // Registrar consulta en auditoría
         logAudit(null, $_SESSION['user_id'], 'consulta_registros',
                 'Consulta de registros propios desde consultar_retiros.php');
     } else if (isAdmin()) {
+        error_log("DEBUG consultar_retiros.php - Sin filtro (admin): mostrando todos los registros");
+
         // Admin ve todos los registros, registrar consulta general
         logAudit(null, $_SESSION['user_id'], 'consulta_registros',
                 'Consulta de todos los registros (admin) desde consultar_retiros.php');
+    } else {
+        error_log("DEBUG consultar_retiros.php - Sin columna usuario_id, mostrando todos los registros");
     }
     
     if (!empty($filtro_oc)) {
@@ -100,22 +111,71 @@ try {
     }
 
     $sql .= " ORDER BY o.programacion_dia_retiro DESC, r.fecha_registro DESC";
-    
+
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $retiros = $stmt->fetchAll();
-    
-    // Estadísticas
-    $stmt = $pdo->query("SELECT
+
+    // ===== ESTADÍSTICAS CON FILTRO POR USUARIO =====
+    // Construir consulta de estadísticas con el mismo filtro que la consulta principal
+    $statsSql = "SELECT
         COUNT(*) as total,
-        SUM(CASE WHEN medidor_retirado = 'SI' THEN 1 ELSE 0 END) as retirados,
-        SUM(CASE WHEN medidor_retirado = 'NO' THEN 1 ELSE 0 END) as no_retirados
-        FROM retiros_medidores");
+        SUM(CASE WHEN r.medidor_retirado = 'SI' THEN 1 ELSE 0 END) as retirados,
+        SUM(CASE WHEN r.medidor_retirado = 'NO' THEN 1 ELSE 0 END) as no_retirados
+        FROM retiros_medidores r
+        INNER JOIN ordenes_servicio o ON r.orden_servicio_id = o.id
+        WHERE 1=1";
+
+    // Aplicar el mismo filtro por usuario
+    $statsParams = [];
+
+    if (isUser() && $userColumnExists) {
+        $statsSql .= " AND r.usuario_id = ?";
+        $statsParams[] = $_SESSION['user_id'];
+        error_log("DEBUG consultar_retiros.php - Filtro de estadísticas aplicado para técnico: usuario_id = " . $_SESSION['user_id']);
+    } else {
+        error_log("DEBUG consultar_retiros.php - Sin filtro de estadísticas (admin o sin columna usuario_id)");
+    }
+
+    // Aplicar otros filtros si están activos
+    if (!empty($filtro_oc)) {
+        $statsSql .= " AND r.orden_servicio LIKE ?";
+        $statsParams[] = "%$filtro_oc%";
+    }
+
+    if (!empty($filtro_fecha_desde)) {
+        $statsSql .= " AND DATE(o.programacion_dia_retiro) >= ?";
+        $statsParams[] = $filtro_fecha_desde;
+    }
+
+    if (!empty($filtro_fecha_hasta)) {
+        $statsSql .= " AND DATE(o.programacion_dia_retiro) <= ?";
+        $statsParams[] = $filtro_fecha_hasta;
+    }
+
+    if (!empty($filtro_retirado)) {
+        $statsSql .= " AND r.medidor_retirado = ?";
+        $statsParams[] = $filtro_retirado;
+    }
+
+    if ($filtro_problematicos === 'SI') {
+        $statsSql .= " AND r.medidor_retirado = 'NO'
+                      AND (r.foto_imposibilidad IS NULL OR r.foto_imposibilidad = '')";
+    }
+
+    $stmt = $pdo->prepare($statsSql);
+    $stmt->execute($statsParams);
     $stats = $stmt->fetch();
+
+    error_log("DEBUG consultar_retiros.php - Estadísticas finales: Total={$stats['total']}, Retirados={$stats['retirados']}, NoRetirados={$stats['no_retirados']}");
 
     // Estadística de casos críticos (registros NO retirados SIN evidencia fotográfica)
     // NOTA: Cualquier registro "NO retirado" sin foto se considera crítico, independientemente del campo de imposibilidad
-    $casosProblematicos = countRetirosImposibilidadSinFoto($pdo);
+    // Para técnicos: solo sus casos críticos, para admin: todos
+    $userIdForStats = (isUser() && $userColumnExists) ? $_SESSION['user_id'] : null;
+    $casosProblematicos = countRetirosImposibilidadSinFoto($pdo, $userIdForStats);
+
+    error_log("DEBUG consultar_retiros.php - Casos críticos: {$casosProblematicos} (userIdForStats: " . ($userIdForStats ?: 'null') . ")");
 
 
 } catch (Exception $e) {
@@ -128,8 +188,8 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Consultar Retiros - GASELAG</title>
-    <!-- Forzar recarga para evitar cache -->
-    <meta name="version" content="2.0">
+    <!-- Forzar recarga para evitar cache - Sistema de aislamiento de datos -->
+    <meta name="version" content="3.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <!-- Cache buster para evitar problemas de cache -->
