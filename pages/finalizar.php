@@ -1,6 +1,9 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación (todos los usuarios)
+requireRole(['admin', 'user']);
+
 // Limpiar las OCs de la sesión
 if (isset($_SESSION['selected_ocs'])) {
     $totalProcesadas = count($_SESSION['selected_ocs']);

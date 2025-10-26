@@ -1,6 +1,9 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación y rol de administrador
+requireRole(['admin']);
+
 $message = '';
 $messageType = '';
 

@@ -1,6 +1,9 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación y rol de administrador
+requireRole(['admin']);
+
 // Filtros (igual que en consultar_retiros.php)
 $filtro_oc = isset($_GET['filtro_oc']) ? trim($_GET['filtro_oc']) : '';
 $filtro_fecha_desde = isset($_GET['filtro_fecha_desde']) ? $_GET['filtro_fecha_desde'] : '';

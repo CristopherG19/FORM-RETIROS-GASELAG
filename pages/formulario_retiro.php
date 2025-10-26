@@ -1,6 +1,9 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación (todos los usuarios)
+requireRole(['admin', 'user']);
+
 // Verificar que haya OCs seleccionadas
 if (!isset($_SESSION['selected_ocs']) || empty($_SESSION['selected_ocs'])) {
     header('Location: buscar_oc.php');

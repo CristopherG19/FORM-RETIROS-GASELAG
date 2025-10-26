@@ -1,6 +1,9 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación (todos los usuarios)
+requireRole(['admin', 'user']);
+
 // Filtros
 $filtro_oc = isset($_GET['filtro_oc']) ? trim($_GET['filtro_oc']) : '';
 $filtro_fecha_desde = isset($_GET['filtro_fecha_desde']) ? $_GET['filtro_fecha_desde'] : '';

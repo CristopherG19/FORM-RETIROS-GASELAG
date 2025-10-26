@@ -1,6 +1,9 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación (todos los usuarios)
+requireRole(['admin', 'user']);
+
 // Inicializar array de OCs seleccionadas si no existe
 if (!isset($_SESSION['selected_ocs'])) {
     $_SESSION['selected_ocs'] = [];

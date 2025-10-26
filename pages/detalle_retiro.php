@@ -1,6 +1,9 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación (todos los usuarios)
+requireRole(['admin', 'user']);
+
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 try {

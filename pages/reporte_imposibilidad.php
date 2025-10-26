@@ -1,8 +1,8 @@
 <?php
 require_once '../config/database.php';
 
-// Verificar permisos o acceso
-session_start();
+// Verificar autenticación y rol de administrador
+requireRole(['admin']);
 
 try {
     $pdo = getConnection();
