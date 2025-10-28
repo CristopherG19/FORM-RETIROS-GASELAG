@@ -3,6 +3,23 @@
 CREATE DATABASE IF NOT EXISTS gaselag_retiros CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE gaselag_retiros;
 
+-- Tabla de usuarios para el sistema de autenticación (DEBE CREARSE PRIMERO)
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    nombre_completo VARCHAR(100) NOT NULL,
+    email VARCHAR(100),
+    rol ENUM('admin', 'user') NOT NULL DEFAULT 'user',
+    estado ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo',
+    ultimo_login TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_username (username),
+    INDEX idx_rol (rol),
+    INDEX idx_estado (estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabla principal de órdenes de servicio (datos del Excel)
 CREATE TABLE IF NOT EXISTS ordenes_servicio (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -45,7 +62,20 @@ CREATE TABLE IF NOT EXISTS ordenes_servicio (
     INDEX idx_num_serie (num_serie_medidor)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tabla para registrar los retiros de medidores
+-- Tabla de tipos de imposibilidad de retiro
+CREATE TABLE IF NOT EXISTS tipos_imposibilidad (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(20) NOT NULL UNIQUE,
+    descripcion VARCHAR(100) NOT NULL,
+    categoria ENUM('acceso', 'medidor', 'cliente', 'seguridad', 'otros') NOT NULL,
+    activo ENUM('SI', 'NO') NOT NULL DEFAULT 'SI',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_categoria (categoria),
+    INDEX idx_activo (activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla para registrar los retiros de medidores (DESPUÉS de usuarios y ordenes_servicio)
 CREATE TABLE IF NOT EXISTS retiros_medidores (
     id INT AUTO_INCREMENT PRIMARY KEY,
     orden_servicio_id INT NOT NULL,
@@ -107,7 +137,7 @@ CREATE TABLE IF NOT EXISTS sesiones_oc (
     INDEX idx_session (session_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tabla para auditoría de acciones del sistema
+-- Tabla para auditoría de acciones del sistema (DESPUÉS de usuarios y retiros_medidores)
 CREATE TABLE IF NOT EXISTS auditoria_retiros (
     id INT AUTO_INCREMENT PRIMARY KEY,
     retiro_id INT NULL, -- NULL para acciones que no involucran un retiro específico
@@ -133,21 +163,8 @@ CREATE TABLE IF NOT EXISTS auditoria_retiros (
     INDEX idx_orden_servicio (orden_servicio)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tabla de tipos de imposibilidad de retiro
-CREATE TABLE IF NOT EXISTS tipos_imposibilidad (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    codigo VARCHAR(20) NOT NULL UNIQUE,
-    descripcion VARCHAR(100) NOT NULL,
-    categoria ENUM('acceso', 'medidor', 'cliente', 'seguridad', 'otros') NOT NULL,
-    activo ENUM('SI', 'NO') NOT NULL DEFAULT 'SI',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_categoria (categoria),
-    INDEX idx_activo (activo)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- Insertar tipos de imposibilidad predefinidos con configuración de evidencia
-INSERT INTO tipos_imposibilidad (codigo, descripcion, categoria) VALUES
+INSERT IGNORE INTO tipos_imposibilidad (codigo, descripcion, categoria) VALUES
 ('NIPLE', 'Se encontró conexión con niple', 'medidor'),
 ('OPOSICION', 'Usuario se opuso al retiro', 'cliente'),
 ('INTERIOR', 'Servicio en interior de la propiedad', 'acceso'),
@@ -183,26 +200,8 @@ ADD INDEX idx_fecha_limite_evidencia (fecha_limite_evidencia),
 ADD INDEX idx_evidencia_completa (evidencia_completa),
 ADD INDEX idx_sancion_aplicada (sancion_aplicada);
 
--- Tabla de usuarios para el sistema de autenticación
-CREATE TABLE IF NOT EXISTS usuarios (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    nombre_completo VARCHAR(100) NOT NULL,
-    email VARCHAR(100),
-    rol ENUM('admin', 'user') NOT NULL DEFAULT 'user',
-    estado ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo',
-    ultimo_login TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_username (username),
-    INDEX idx_rol (rol),
-    INDEX idx_estado (estado)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- Insertar usuarios por defecto
-INSERT INTO usuarios (username, password, nombre_completo, email, rol) VALUES
+INSERT IGNORE INTO usuarios (username, password, nombre_completo, email, rol) VALUES
 ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Administrador del Sistema', 'admin@gaselag.com', 'admin'),
 ('tecnico1', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Técnico de Retiro 1', 'tecnico1@gaselag.com', 'user'),
 ('tecnico2', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Técnico de Retiro 2', 'tecnico2@gaselag.com', 'user');
-
