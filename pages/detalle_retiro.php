@@ -112,10 +112,15 @@ $evidenciaPendiente = $data['evidencia_obligatoria'] === 'SI' && $data['evidenci
                     </strong>
                 </p>
                 <p class="mb-2">
-                    <?php if ($data['tipo_imposibilidad_descripcion']): ?>
-                        <strong>Tipo de Imposibilidad:</strong> <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?>
+                    <?php if ($data['tipo_imposibilidad_id']): ?>
+                        <strong>Motivo de imposibilidad:</strong>
+                        <?php if ($data['tipo_imposibilidad_categoria'] === 'otros' && $data['detalles_imposibilidad']): ?>
+                            <?= htmlspecialchars($data['detalles_imposibilidad']) ?>
+                        <?php else: ?>
+                            <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?>
+                        <?php endif; ?>
                     <?php else: ?>
-                        Este registro requiere evidencia fotográfica pero no tiene tipo de imposibilidad especificado.
+                        <strong>Registro sin motivo de imposibilidad especificado</strong> - Requiere evidencia fotográfica
                     <?php endif; ?>
                 </p>
                 <?php if ($tiempoRestante !== 'vencida'): ?>
@@ -150,11 +155,15 @@ $evidenciaPendiente = $data['evidencia_obligatoria'] === 'SI' && $data['evidenci
                     <i class="bi bi-check-circle"></i> REGISTRO COMPLETO
                 </h5>
                 <p class="mb-0">
-                    <?php if ($data['tipo_imposibilidad_descripcion']): ?>
-                        <strong>✅ <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?> con evidencia fotográfica</strong><br>
+                    <?php if ($data['tipo_imposibilidad_id']): ?>
+                        <strong>✅ Motivo: <?php if ($data['tipo_imposibilidad_categoria'] === 'otros' && $data['detalles_imposibilidad']): ?>
+                            <?= htmlspecialchars($data['detalles_imposibilidad']) ?>
+                        <?php else: ?>
+                            <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?>
+                        <?php endif; ?> con evidencia fotográfica</strong><br>
                         Este registro está correctamente documentado.
                     <?php else: ?>
-                        <strong>✅ No retiro con evidencia fotográfica</strong><br>
+                        <strong>✅ Registro sin motivo especificado con evidencia fotográfica</strong><br>
                         Este registro está correctamente documentado.
                     <?php endif; ?>
                 </p>
@@ -241,9 +250,18 @@ $evidenciaPendiente = $data['evidencia_obligatoria'] === 'SI' && $data['evidenci
                             <?= $categoriaIcon ?> <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?>
                         </span>
                         <?php if ($data['detalles_imposibilidad']): ?>
-                            <br><small class="text-muted">
-                                <i class="bi bi-chat-left-text"></i> <?= htmlspecialchars($data['detalles_imposibilidad']) ?>
-                            </small>
+                            <?php if ($data['tipo_imposibilidad_categoria'] === 'otros'): ?>
+                                <div class="mt-2">
+                                    <small class="text-muted d-block mb-1"><i class="bi bi-chat-quote"></i> <strong>Motivo específico:</strong></small>
+                                    <div class="alert alert-light border-start border-primary" style="font-size: 0.9em;">
+                                        <?= nl2br(htmlspecialchars($data['detalles_imposibilidad'])) ?>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <br><small class="text-muted">
+                                    <i class="bi bi-chat-left-text"></i> <?= htmlspecialchars($data['detalles_imposibilidad']) ?>
+                                </small>
+                            <?php endif; ?>
                         <?php endif; ?>
                     <?php elseif ($data['visor_imposibilidad_lectura'] === 'SI'): ?>
                         <span class="badge bg-info">📷 Imposibilidad de Lectura</span>
@@ -406,10 +424,15 @@ $evidenciaPendiente = $data['evidencia_obligatoria'] === 'SI' && $data['evidenci
                 <input type="hidden" name="retiro_id" value="<?php echo $data['retiro_id']; ?>">
                 <div class="modal-body">
                     <div class="alert alert-info">
-                        <strong>Información:</strong><br>
-                        Tipo de Imposibilidad: <strong><?php echo htmlspecialchars($data['tipo_imposibilidad_descripcion'] ?: 'No especificado'); ?></strong><br>
-                        <?php if ($data['detalles_imposibilidad']): ?>
-                            Detalles: <?php echo htmlspecialchars($data['detalles_imposibilidad']); ?><br>
+                        <strong>Información del motivo:</strong><br>
+                        <?php if ($data['tipo_imposibilidad_id']): ?>
+                            <strong>Motivo:</strong> <?php if ($data['tipo_imposibilidad_categoria'] === 'otros' && $data['detalles_imposibilidad']): ?>
+                                <?= htmlspecialchars($data['detalles_imposibilidad']) ?>
+                            <?php else: ?>
+                                <?= htmlspecialchars($data['tipo_imposibilidad_descripcion']) ?>
+                            <?php endif; ?><br>
+                        <?php else: ?>
+                            <strong>Motivo:</strong> No especificado<br>
                         <?php endif; ?>
                         Tiempo restante: <strong><?php echo htmlspecialchars(getTiempoRestanteEvidencia($data['retiro_id']) ?: 'Sin límite'); ?></strong>
                     </div>

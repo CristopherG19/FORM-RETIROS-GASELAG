@@ -627,15 +627,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </div>
 
-                        <!-- DETALLES ADICIONALES (opcional) -->
-                        <div class="mb-4">
+                        <!-- DETALLES ADICIONALES (solo para "Otros") -->
+                        <div class="mb-4" id="campo_detalles_imposibilidad" style="display: none;">
                             <label for="detalles_imposibilidad" class="form-label">
-                                <i class="bi bi-chat-left-text"></i> Detalles Adicionales
+                                <i class="bi bi-chat-left-text"></i> Motivo Personalizado <span class="text-danger">*</span>
                             </label>
                             <textarea class="form-control" id="detalles_imposibilidad" name="detalles_imposibilidad"
-                                      rows="2" placeholder="Información adicional o detalles específicos..."></textarea>
+                                      rows="2" placeholder="Describa específicamente el motivo de la imposibilidad..."></textarea>
                             <div class="form-text">
-                                Proporcione detalles adicionales que ayuden a entender mejor la situación
+                                <strong class="text-danger">Requerido:</strong> Especifique el motivo detallado por el cual no se pudo retirar el medidor
                             </div>
                         </div>
                     </div>
@@ -646,9 +646,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <div class="mb-4">
                         <textarea class="form-control" id="observacion" name="observacion" rows="3"
-                                  placeholder="Información adicional que complemente el tipo de imposibilidad seleccionado..." required></textarea>
+                                  placeholder="Información adicional opcional que complemente el registro..."></textarea>
                         <div class="form-text">
-                            <strong>Importante:</strong> Describa detalles específicos de la situación que no estén cubiertos por el tipo de imposibilidad seleccionado
+                            Opcional: Puede agregar observaciones adicionales sobre la situación si lo considera necesario
                         </div>
                     </div>
 
@@ -712,9 +712,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     obsHelp.style.display = 'none';
 
                     // Limpiar validaciones de NO retiro
-                    document.getElementById('observacion').removeAttribute('required');
                     document.getElementById('tipo_imposibilidad').removeAttribute('required');
                     document.getElementById('detalles_imposibilidad').removeAttribute('required');
+                    // observacion es opcional, no necesita required
                 } else {
                     camposRetiro.style.display = 'none';
                     campoFoto.style.display = 'block';
@@ -722,9 +722,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     obsHelp.style.display = 'block';
 
                     // Hacer obligatorios los campos de NO retiro
-                    document.getElementById('observacion').setAttribute('required', 'required');
                     document.getElementById('tipo_imposibilidad').setAttribute('required', 'required');
-                    // detalles_imposibilidad es opcional
+                    // detalles_imposibilidad se maneja dinámicamente según el tipo
+                    // observacion es opcional
+
+                    // Inicializar validación de detalles
+                    setTimeout(toggleDetallesRequeridos, 10);
                 }
             }
         }
@@ -765,12 +768,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (obsHelp) obsHelp.style.display = 'none';
 
                     // Limpiar validaciones de NO retiro
-                    const observacion = document.getElementById('observacion');
-                    if (observacion) observacion.removeAttribute('required');
                     const tipoImposibilidad = document.getElementById('tipo_imposibilidad');
                     if (tipoImposibilidad) tipoImposibilidad.removeAttribute('required');
                     const detallesImposibilidad = document.getElementById('detalles_imposibilidad');
                     if (detallesImposibilidad) detallesImposibilidad.removeAttribute('required');
+                    // observacion es opcional
                 } else {
                     console.log('Mostrando campos de medidor NO retirado');
                     if (camposRetiro) camposRetiro.style.display = 'none';
@@ -779,11 +781,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (obsHelp) obsHelp.style.display = 'block';
 
                     // Hacer obligatorios los campos de NO retiro
-                    const observacion = document.getElementById('observacion');
-                    if (observacion) observacion.setAttribute('required', 'required');
                     const tipoImposibilidad = document.getElementById('tipo_imposibilidad');
                     if (tipoImposibilidad) tipoImposibilidad.setAttribute('required', 'required');
                     // detalles_imposibilidad es opcional
+                    // observacion es opcional
                 }
             }
 
@@ -818,7 +819,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     });
                 }
             });
+
+            // Agregar event listener para cambios en tipo de imposibilidad
+            document.getElementById('tipo_imposibilidad').addEventListener('change', function() {
+                toggleDetallesRequeridos();
+            });
         });
+
+        function toggleDetallesRequeridos() {
+            const tipoSelect = document.getElementById('tipo_imposibilidad');
+            const campoDetalles = document.getElementById('campo_detalles_imposibilidad');
+            const detallesField = document.getElementById('detalles_imposibilidad');
+
+            if (tipoSelect.selectedIndex > 0) {
+                const tipoSeleccionado = tipoSelect.options[tipoSelect.selectedIndex];
+                const tipoTexto = tipoSeleccionado ? tipoSeleccionado.text.toLowerCase() : '';
+
+                if (tipoTexto.includes('otros')) {
+                    // Mostrar campo requerido para "Otros"
+                    campoDetalles.style.display = 'block';
+                    detallesField.setAttribute('required', 'required');
+                } else {
+                    // Ocultar campo para tipos predefinidos - el tipo seleccionado ya es suficiente
+                    campoDetalles.style.display = 'none';
+                    detallesField.removeAttribute('required');
+                    detallesField.value = ''; // Limpiar si había algo
+                }
+            } else {
+                // Sin tipo seleccionado, ocultar campo
+                campoDetalles.style.display = 'none';
+                detallesField.removeAttribute('required');
+                detallesField.value = ''; // Limpiar si había algo
+            }
+        }
 
         function toggleFiltroFields() {
             const tieneFiltro = document.querySelector('input[name="medidor_tiene_filtro"]:checked');
@@ -842,13 +875,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (retirado.value === 'NO') {
-                const observacion = document.getElementById('observacion').value.trim();
-                if (observacion === '') {
-                    e.preventDefault();
-                    alert('Debe indicar el motivo por el cual no se retiró el medidor en el campo de Observación');
-                    return false;
-                }
-
                 // Validar tipo de imposibilidad
                 const tipoImposibilidad = document.getElementById('tipo_imposibilidad');
                 if (!tipoImposibilidad.value) {
@@ -857,12 +883,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     return false;
                 }
 
-                // Si se seleccionó "Otros", verificar que haya detalles
-                if (tipoImposibilidad.value === '11') { // ID del tipo "Otros"
+                // Si se seleccionó "Otros", verificar que haya detalles personalizados
+                const tipoSeleccionado = tipoImposibilidad.options[tipoImposibilidad.selectedIndex];
+                const tipoTexto = tipoSeleccionado ? tipoSeleccionado.text.toLowerCase() : '';
+
+                if (tipoTexto.includes('otros')) {
                     const detalles = document.getElementById('detalles_imposibilidad').value.trim();
                     if (detalles === '') {
                         e.preventDefault();
-                        alert('Debe especificar el motivo en los detalles cuando selecciona "Otros"');
+                        alert('Cuando selecciona "Otros Motivos", debe especificar el motivo personalizado en el campo "Motivo Personalizado"');
+                        document.getElementById('detalles_imposibilidad').focus();
                         return false;
                     }
                 }

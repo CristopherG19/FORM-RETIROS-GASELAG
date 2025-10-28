@@ -11,6 +11,9 @@ $currentUser = getCurrentUser();
 $action = $_GET['action'] ?? '';
 $userId = $_GET['id'] ?? 0;
 
+// Manejar mensaje de éxito desde redirección
+$success = $_GET['success'] ?? null;
+
 // Procesar creación de nuevo usuario
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username'])) {
     $username = trim($_POST['username']);
@@ -46,6 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username'])) {
                 $insertStmt->execute();
 
                 $success = "Usuario creado correctamente";
+
+                // Redirigir limpiamente
+                header('Location: gestion_usuarios.php?success=' . urlencode($success));
+                exit;
             }
         } catch (PDOException $e) {
             $error = "Error al crear usuario: " . $e->getMessage();
@@ -73,6 +80,10 @@ if ($action === 'toggle_status' && $userId) {
             $updateStmt->execute();
 
             $success = "Estado del usuario actualizado correctamente";
+
+            // Redirigir limpiamente para evitar loops
+            header('Location: gestion_usuarios.php?success=' . urlencode($success));
+            exit;
         }
     } catch (PDOException $e) {
         $error = "Error al actualizar usuario: " . $e->getMessage();
@@ -89,6 +100,10 @@ if ($action === 'delete' && $userId && $userId != $currentUser['id']) {
         $deleteStmt->execute();
 
         $success = "Usuario eliminado correctamente";
+
+        // Redirigir limpiamente para evitar problemas
+        header('Location: gestion_usuarios.php?success=' . urlencode($success));
+        exit;
     } catch (PDOException $e) {
         $error = "Error al eliminar usuario: " . $e->getMessage();
     }
@@ -373,12 +388,7 @@ try {
             document.getElementById('addUserForm').reset();
         });
 
-        // Recargar página después de mostrar mensaje de éxito
-        <?php if (isset($success)): ?>
-            setTimeout(function() {
-                location.reload();
-            }, 2000);
-        <?php endif; ?>
+        // Ya no necesitamos recargar automáticamente, las redirecciones limpian la URL
     </script>
 </body>
 </html>

@@ -13,7 +13,7 @@ $filtro_retirado = isset($_GET['filtro_retirado']) ? $_GET['filtro_retirado'] : 
 try {
     $pdo = getConnection();
     
-    $sql = "SELECT 
+    $sql = "SELECT
                 r.*,
                 o.cliente,
                 o.usuario_reclamante,
@@ -23,9 +23,18 @@ try {
                 o.modelo_medidor,
                 o.centro_servicio,
                 o.remesa,
-                o.programacion_dia_retiro
+                o.programacion_dia_retiro,
+                ti.descripcion as tipo_imposibilidad_descripcion,
+                ti.categoria as tipo_imposibilidad_categoria,
+                ti.codigo as tipo_imposibilidad_codigo,
+                u.nombre_completo as registrado_por,
+                u.username as username_registrado,
+                admin_u.nombre_completo as admin_sancion
             FROM retiros_medidores r
             INNER JOIN ordenes_servicio o ON r.orden_servicio_id = o.id
+            LEFT JOIN tipos_imposibilidad ti ON r.tipo_imposibilidad_id = ti.id
+            LEFT JOIN usuarios u ON r.usuario_id = u.id
+            LEFT JOIN usuarios admin_u ON r.admin_sancion_id = admin_u.id
             WHERE 1=1";
     
     $params = [];
@@ -95,6 +104,19 @@ fputcsv($output, [
     'Solidos Retenidos',
     'Info Caja y Medidor',
     'Observacion',
+    'Tipo Imposibilidad',
+    'Categoria Tipo',
+    'Codigo Tipo',
+    'Detalles Imposibilidad',
+    'Evidencia Obligatoria',
+    'Evidencia Completa',
+    'Fecha Limite Evidencia',
+    'Sancion Aplicada',
+    'Motivo Sancion',
+    'Fecha Sancion',
+    'Registrado Por',
+    'Username Registrado',
+    'Admin Sancion',
     'Tecnico Responsable',
     'Tiene Foto'
 ]); // Usar coma como delimitador estándar
@@ -123,7 +145,20 @@ foreach ($retiros as $retiro) {
         $retiro['solidos_retenidos_filtro'] ?? '',
         $retiro['info_caja_medidor'] ?? '',
         $retiro['observacion'],
-        $retiro['tecnico_responsable'],
+        $retiro['tipo_imposibilidad_descripcion'] ?? 'N/A',
+        $retiro['tipo_imposibilidad_categoria'] ?? 'N/A',
+        $retiro['tipo_imposibilidad_codigo'] ?? 'N/A',
+        $retiro['detalles_imposibilidad'] ?? '',
+        $retiro['evidencia_obligatoria'] ?? 'NO',
+        $retiro['evidencia_completa'] ?? 'NO',
+        !empty($retiro['fecha_limite_evidencia']) ? date('d/m/Y H:i', strtotime($retiro['fecha_limite_evidencia'])) : '',
+        $retiro['sancion_aplicada'] ?? 'NO',
+        $retiro['motivo_sancion'] ?? '',
+        !empty($retiro['fecha_sancion']) ? date('d/m/Y H:i', strtotime($retiro['fecha_sancion'])) : '',
+        $retiro['registrado_por'] ?? 'Sistema Anterior',
+        $retiro['username_registrado'] ?? '',
+        $retiro['admin_sancion'] ?? '',
+        $retiro['tecnico_responsable'] ?? '',
         (!empty($retiro['foto_imposibilidad'])) ? 'SÍ' : 'NO'
     ]); // Usar coma como delimitador estándar
 }

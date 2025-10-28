@@ -234,6 +234,7 @@ function checkExistingRetiro($ordenServicio) {
     $pdo = getConnection();
 
     try {
+        // Buscar el último registro de esta OC
         $sql = "SELECT r.*, u.nombre_completo as tecnico_responsable
                 FROM retiros_medidores r
                 LEFT JOIN usuarios u ON r.usuario_id = u.id
@@ -244,7 +245,29 @@ function checkExistingRetiro($ordenServicio) {
         $stmt->bindParam(':orden_servicio', $ordenServicio);
         $stmt->execute();
 
-        return $stmt->fetch();
+        $retiro = $stmt->fetch();
+
+        // Si existe un registro, verificar su estado
+        if ($retiro) {
+            // Si el estado es 'reabierto', significa que fue limpiada la asignación
+            // y cualquier técnico puede registrarla nuevamente
+            if ($retiro['estado_registro'] === 'reabierto') {
+                return null; // Tratar como si no existiera asignación
+            }
+
+            // Si hay usuario_id asignado y el estado no es 'reabierto',
+            // entonces está bloqueada para otros técnicos
+            if ($retiro['usuario_id']) {
+                return $retiro;
+            }
+
+            // Si no hay usuario_id asignado pero existe el registro,
+            // permitir registro (caso antiguo)
+            return $retiro;
+        }
+
+        // No existe registro, OC disponible
+        return null;
     } catch (PDOException $e) {
         error_log("Error al verificar retiro existente: " . $e->getMessage());
         return null;
@@ -453,39 +476,66 @@ function getAuditHistory($filters = []) {
 // Función para reasignar un retiro a otro técnico (solo admin)
 function reassignRetiro($retiroId, $newUserId, $adminUserId, $reason = '') {
     if (!isAdmin()) {
-        return false;
+        throw new Exception("No tienes permisos para reasignar");
     }
 
     $pdo = getConnection();
 
     try {
-        $pdo->beginTransaction();
+        // SIN TRANSACCIÓN PARA EVITAR BLOQUEOS
+        // PRIMERO: Verificar que el nuevo usuario existe y es válido
+        $userSql = "SELECT nombre_completo, estado, rol FROM usuarios WHERE id = ?";
+        $userStmt = $pdo->prepare($userSql);
+        $userStmt->execute([$newUserId]);
+        $newUser = $userStmt->fetch();
 
-        // Actualizar el retiro
-        $sql = "UPDATE retiros_medidores
-                SET usuario_id = ?, estado_registro = 'reasignado',
-                    usuario_reasignado_por = ?, fecha_reasignacion = NOW()
-                WHERE id = ?";
+        if (!$newUser) {
+            throw new Exception("Usuario destino no encontrado");
+        }
+        if ($newUser['estado'] !== 'activo') {
+            throw new Exception("El usuario destino no está activo");
+        }
+        if ($newUser['rol'] !== 'user') {
+            throw new Exception("Solo se puede reasignar a técnicos");
+        }
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$newUserId, $adminUserId, $retiroId]);
+        // SEGUNDO: Obtener info actual del retiro
+        $retiroSql = "SELECT usuario_id, orden_servicio FROM retiros_medidores WHERE id = ?";
+        $retiroStmt = $pdo->prepare($retiroSql);
+        $retiroStmt->execute([$retiroId]);
+        $retiro = $retiroStmt->fetch();
 
-        // Obtener información del retiro para auditoría
-        $retiroInfo = getRetiroInfo($retiroId);
-        $oldUserInfo = getUserInfo($retiroInfo['usuario_id']);
-        $newUserInfo = getUserInfo($newUserId);
+        if (!$retiro) {
+            throw new Exception("Retiro no encontrado");
+        }
 
-        // Registrar en auditoría
+        // TERCERO: Verificar que no sea el mismo técnico
+        if ($retiro['usuario_id'] == $newUserId) {
+            throw new Exception("No se puede reasignar al mismo técnico actual");
+        }
+
+        // CUARTO: HACER LA REASIGNACIÓN DIRECTA
+        $updateSql = "UPDATE retiros_medidores
+                     SET usuario_id = ?, tecnico_responsable = ?, estado_registro = 'reasignado',
+                         usuario_reasignado_por = ?, fecha_reasignacion = NOW()
+                     WHERE id = ?";
+
+        $updateStmt = $pdo->prepare($updateSql);
+        $updateStmt->execute([$newUserId, $newUser['nombre_completo'], $adminUserId, $retiroId]);
+
+        // AUDITORÍA
         logAudit($retiroId, $adminUserId, 'reasignacion_oc',
-                "Reasignado de {$oldUserInfo['nombre_completo']} a {$newUserInfo['nombre_completo']}. Razón: $reason",
-                $retiroInfo['orden_servicio']);
+                "Reasignado a técnico ID {$newUserId}. Razón: $reason",
+                $retiro['orden_servicio']);
 
-        $pdo->commit();
         return true;
+
     } catch (PDOException $e) {
-        $pdo->rollBack();
         error_log("Error al reasignar retiro: " . $e->getMessage());
-        return false;
+        throw new Exception("Error de base de datos al reasignar");
+    } catch (Exception $e) {
+        error_log("Validación fallida en reasignación: " . $e->getMessage());
+        throw $e;
     }
 }
 
@@ -500,13 +550,33 @@ function reopenOC($retiroId, $adminUserId, $reason = '') {
     try {
         $pdo->beginTransaction();
 
-        // Obtener información antes de actualizar
-        $retiroInfo = getRetiroInfo($retiroId);
+        // VALIDACIONES PREVIAS
 
-        // Marcar como reabierto
+        // 1. Verificar que el retiro existe
+        $retiroInfo = getRetiroInfo($retiroId);
+        if (!$retiroInfo) {
+            throw new Exception("Retiro no encontrado");
+        }
+
+        // 2. Verificar que no esté ya reabierto recientemente
+        if ($retiroInfo['estado_registro'] === 'reabierto') {
+            // Verificar si fue reabierto en los últimos 5 minutos
+            if ($retiroInfo['fecha_reasignacion'] &&
+                strtotime($retiroInfo['fecha_reasignacion']) > (time() - 300)) {
+                throw new Exception("Esta OC fue reabierta recientemente. Espere unos minutos antes de reabrir nuevamente.");
+            }
+        }
+
+        // 3. No permitir reabrir OCs que ya fueron retiradas exitosamente
+        if ($retiroInfo['medidor_retirado'] === 'SI') {
+            throw new Exception("No se puede reabrir una OC que ya fue retirada exitosamente");
+        }
+
+        // Marcar como reabierto y LIMPIAR asignación de usuario
+        // Esto permite que cualquier técnico pueda registrar esta OC
         $sql = "UPDATE retiros_medidores
                 SET estado_registro = 'reabierto', usuario_reasignado_por = ?,
-                    fecha_reasignacion = NOW()
+                    fecha_reasignacion = NOW(), usuario_id = NULL, tecnico_responsable = NULL
                 WHERE id = ?";
 
         $stmt = $pdo->prepare($sql);
@@ -514,7 +584,7 @@ function reopenOC($retiroId, $adminUserId, $reason = '') {
 
         // Registrar en auditoría
         logAudit($retiroId, $adminUserId, 'reapertura_oc',
-                "OC reabierta para nuevo registro. Razón: $reason",
+                "OC reabierta para nuevo registro (usuario_id limpiado). Razón: $reason",
                 $retiroInfo['orden_servicio']);
 
         $pdo->commit();
@@ -522,6 +592,10 @@ function reopenOC($retiroId, $adminUserId, $reason = '') {
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log("Error al reabrir OC: " . $e->getMessage());
+        return false;
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        error_log("Validación fallida en reapertura: " . $e->getMessage());
         return false;
     }
 }
@@ -552,7 +626,7 @@ function getUserInfo($userId) {
     $pdo = getConnection();
 
     try {
-        $sql = "SELECT nombre_completo, username FROM usuarios WHERE id = ?";
+        $sql = "SELECT nombre_completo, username, estado, rol FROM usuarios WHERE id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->bindParam(1, $userId);
         $stmt->execute();
@@ -714,23 +788,18 @@ function getEstadisticasImposibilidad($userId = null) {
     $pdo = getConnection();
 
     try {
-        // Verificar si existe la columna tipo_imposibilidad_id
-        $columnExists = false;
+        // Verificar si existe la columna usuario_id para filtrado
+        $userColumnExists = false;
         try {
-            $checkColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'tipo_imposibilidad_id'";
-            $columnExists = $pdo->query($checkColumnQuery)->rowCount() > 0;
+            $checkUserColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'usuario_id'";
+            $userColumnExists = $pdo->query($checkUserColumnQuery)->rowCount() > 0;
         } catch (Exception $e) {
-            $columnExists = false;
-        }
-
-        if (!$columnExists) {
-            // Si no existe la columna, usar análisis de texto de observaciones
-            return getEstadisticasImposibilidadFromText($userId);
+            $userColumnExists = false;
         }
 
         $sql = "SELECT
-                    ti.descripcion as tipo_imposibilidad,
-                    ti.categoria,
+                    COALESCE(ti.descripcion, 'Sin tipo especificado') as tipo_imposibilidad,
+                    COALESCE(ti.categoria, 'sin_categoria') as categoria,
                     COUNT(*) as cantidad,
                     COUNT(CASE WHEN r.medidor_retirado = 'NO' THEN 1 END) as no_retirados,
                     COUNT(CASE WHEN r.medidor_retirado = 'SI' THEN 1 END) as retirados
@@ -740,7 +809,7 @@ function getEstadisticasImposibilidad($userId = null) {
 
         $params = [];
 
-        // Aplicar filtro por usuario si es técnico
+        // Aplicar filtro por usuario si es técnico y existe la columna
         if (isUser() && $userColumnExists) {
             $sql .= " AND r.usuario_id = ?";
             $params[] = $userId ?: $_SESSION['user_id'];
@@ -764,6 +833,15 @@ function getEstadisticasImposibilidadFromText($userId = null) {
     $pdo = getConnection();
 
     try {
+        // Verificar si existe la columna usuario_id para filtrado
+        $userColumnExists = false;
+        try {
+            $checkUserColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'usuario_id'";
+            $userColumnExists = $pdo->query($checkUserColumnQuery)->rowCount() > 0;
+        } catch (Exception $e) {
+            $userColumnExists = false;
+        }
+
         $sql = "SELECT
                     CASE
                         WHEN LOWER(r.observacion) LIKE '%niple%' THEN 'Se encontró conexión con niple'

@@ -11,14 +11,24 @@ $currentUser = getCurrentUser();
 $action = $_GET['action'] ?? '';
 $retiroId = $_GET['id'] ?? 0;
 
+// Manejar mensaje de éxito desde redirección
+$success = $_GET['success'] ?? null;
+
 if ($action === 'reassign' && $retiroId && isset($_POST['new_user_id'])) {
     $newUserId = $_POST['new_user_id'];
     $reason = trim($_POST['reason'] ?? '');
 
-    if (reassignRetiro($retiroId, $newUserId, $_SESSION['user_id'], $reason)) {
-        $success = "Registro reasignado correctamente";
-    } else {
-        $error = "Error al reasignar el registro";
+    // Intentar reasignación con mejor manejo de errores
+    try {
+        if (reassignRetiro($retiroId, $newUserId, $_SESSION['user_id'], $reason)) {
+            // Redirigir limpiamente para evitar re-ejecución automática
+            header('Location: gestion_retiros.php?success=' . urlencode('Registro reasignado correctamente'));
+            exit;
+        } else {
+            $error = "Error al reasignar el registro";
+        }
+    } catch (Exception $e) {
+        $error = "Error en reasignación: " . $e->getMessage();
     }
 }
 
@@ -26,7 +36,9 @@ if ($action === 'reopen' && $retiroId && isset($_POST['reason'])) {
     $reason = trim($_POST['reason']);
 
     if (reopenOC($retiroId, $_SESSION['user_id'], $reason)) {
-        $success = "OC reabierta correctamente para nuevo registro";
+        // Redirigir limpiamente para evitar re-ejecución automática
+        header('Location: gestion_retiros.php?success=' . urlencode('OC reabierta correctamente para nuevo registro'));
+        exit;
     } else {
         $error = "Error al reabrir la OC";
     }
@@ -35,12 +47,33 @@ if ($action === 'reopen' && $retiroId && isset($_POST['reason'])) {
 // Obtener lista de usuarios para reasignación
 $pdo = getConnection();
 try {
+    // Obtener información del retiro actual para excluir al técnico asignado
+    $currentRetiroId = $_GET['id'] ?? 0;
+    $currentUserId = null;
+
+    if ($currentRetiroId) {
+        $retiroSql = "SELECT usuario_id FROM retiros_medidores WHERE id = ?";
+        $retiroStmt = $pdo->prepare($retiroSql);
+        $retiroStmt->execute([$currentRetiroId]);
+        $retiroData = $retiroStmt->fetch();
+        $currentUserId = $retiroData ? $retiroData['usuario_id'] : null;
+    }
+
+    // Obtener usuarios disponibles, excluyendo al técnico actual si existe
     $usersSql = "SELECT id, username, nombre_completo, rol, estado
                  FROM usuarios
-                 WHERE estado = 'activo' AND rol = 'user'
-                 ORDER BY nombre_completo";
+                 WHERE estado = 'activo' AND rol = 'user'";
+    $params = [];
+
+    if ($currentUserId) {
+        $usersSql .= " AND id != ?";
+        $params[] = $currentUserId;
+    }
+
+    $usersSql .= " ORDER BY nombre_completo";
+
     $usersStmt = $pdo->prepare($usersSql);
-    $usersStmt->execute();
+    $usersStmt->execute($params);
     $availableUsers = $usersStmt->fetchAll();
 } catch (PDOException $e) {
     $availableUsers = [];
@@ -568,12 +601,46 @@ try {
             new bootstrap.Modal(document.getElementById('reassignModal')).show();
         }
 
-        // Auto-recargar después de acciones exitosas
-        <?php if (isset($success)): ?>
+        // Prevenir múltiples submits en los formularios
+        document.getElementById('reassignForm').addEventListener('submit', function(e) {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            console.log('Submit event triggered, button disabled:', submitBtn.disabled);
+
+            // Si ya está deshabilitado, prevenir submit
+            if (submitBtn.disabled) {
+                e.preventDefault();
+                alert('Ya se está procesando la reasignación...');
+                console.log('Submit prevented - button was disabled');
+                return false;
+            }
+
+            // Deshabilitar inmediatamente
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+            console.log('Button disabled and form submitted');
+
+            // El botón se rehabilitará cuando se recargue la página
+        });
+
+        document.getElementById('reopenForm').addEventListener('submit', function(e) {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn.disabled) {
+                e.preventDefault();
+                return false;
+            }
+
+            // Deshabilitar botón y mostrar loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Reabriendo...';
+
+            // Re-habilitar después de 30 segundos por si acaso
             setTimeout(function() {
-                location.reload();
-            }, 2000);
-        <?php endif; ?>
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Reabrir OC';
+            }, 30000);
+        });
+
+        // Ya no necesitamos auto-reload, usamos redirecciones limpias
     </script>
 </body>
 </html>
