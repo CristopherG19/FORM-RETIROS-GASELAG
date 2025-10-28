@@ -200,13 +200,26 @@
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
                 ]);
                 
-                // Crear base de datos
+                // Eliminar base de datos existente (si existe)
+                echo '<div class="step info">';
+                echo '<span class="icon">🗑️</span>';
+                echo 'Eliminando base de datos existente (si existe)...';
+                echo '</div>';
+                
+                $pdo->exec("DROP DATABASE IF EXISTS gaselag_retiros");
+                
+                echo '<div class="step success">';
+                echo '<span class="icon">✅</span>';
+                echo '<strong>Base de datos anterior eliminada</strong>';
+                echo '</div>';
+                
+                // Crear base de datos nueva
                 echo '<div class="step info">';
                 echo '<span class="icon">⏳</span>';
                 echo 'Creando base de datos <code>gaselag_retiros</code>...';
                 echo '</div>';
                 
-                $pdo->exec("CREATE DATABASE IF NOT EXISTS gaselag_retiros CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                $pdo->exec("CREATE DATABASE gaselag_retiros CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
                 
                 echo '<div class="step success">';
                 echo '<span class="icon">✅</span>';
@@ -219,27 +232,52 @@
                 // Leer y ejecutar schema.sql
                 echo '<div class="step info">';
                 echo '<span class="icon">⏳</span>';
-                echo 'Creando tablas...';
+                echo 'Creando tablas y datos iniciales...';
                 echo '</div>';
                 
                 $sql = file_get_contents('database/schema.sql');
                 
                 // Dividir por punto y coma y ejecutar cada statement
                 $statements = array_filter(array_map('trim', explode(';', $sql)));
+                $tablas_creadas = [];
+                $datos_insertados = 0;
                 
                 foreach ($statements as $statement) {
                     if (!empty($statement) && stripos($statement, 'CREATE DATABASE') === false && stripos($statement, 'USE ') === false) {
-                        $pdo->exec($statement);
+                        try {
+                            $pdo->exec($statement);
+                            
+                            // Contar tablas creadas
+                            if (stripos($statement, 'CREATE TABLE') !== false) {
+                                preg_match('/CREATE TABLE.*?`?(\w+)`?/i', $statement, $matches);
+                                if (isset($matches[1])) {
+                                    $tablas_creadas[] = $matches[1];
+                                }
+                            }
+                            
+                            // Contar datos insertados
+                            if (stripos($statement, 'INSERT') !== false) {
+                                $datos_insertados++;
+                            }
+                            
+                        } catch (PDOException $e) {
+                            // Si es un error de duplicado, lo ignoramos
+                            if (strpos($e->getMessage(), 'Duplicate entry') === false && 
+                                strpos($e->getMessage(), 'already exists') === false) {
+                                throw $e; // Re-lanzar si no es un error de duplicado
+                            }
+                        }
                     }
                 }
                 
                 echo '<div class="step success">';
                 echo '<span class="icon">✅</span>';
-                echo '<strong>Tablas creadas exitosamente</strong>';
+                echo '<strong>Base de datos instalada exitosamente</strong>';
                 echo '<ul>';
-                echo '<li>✓ ordenes_servicio</li>';
-                echo '<li>✓ retiros_medidores</li>';
-                echo '<li>✓ sesiones_oc</li>';
+                foreach ($tablas_creadas as $tabla) {
+                    echo '<li>✓ ' . $tabla . '</li>';
+                }
+                echo '<li>✓ ' . $datos_insertados . ' conjuntos de datos iniciales</li>';
                 echo '</ul>';
                 echo '</div>';
                 
