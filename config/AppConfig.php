@@ -251,6 +251,24 @@ function timeAgo($datetime) {
 }
 
 /**
+ * Escapa output de forma segura para HTML
+ * SEGURIDAD: Wrapper para htmlspecialchars con configuración consistente
+ */
+function e($string) {
+    return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Escapa output pero preserva HTML seguro (solo para mensajes del sistema)
+ * ADVERTENCIA: Solo usar con contenido controlado por el sistema
+ */
+function eSafe($string) {
+    // Permitir solo tags seguros: <strong>, <em>, <br>, <small>
+    $allowed = '<strong><em><br><small><i><b>';
+    return strip_tags($string ?? '', $allowed);
+}
+
+/**
  * Genera paginación
  */
 function generatePagination($currentPage, $totalPages, $baseUrl) {

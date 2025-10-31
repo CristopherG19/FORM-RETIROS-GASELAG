@@ -49,70 +49,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #f5f7fa;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         }
         .login-card {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            border: none;
-            max-width: 400px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e8ecef;
             width: 100%;
+            margin: 0 auto;
         }
         .login-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #2c3e50;
             color: white;
-            padding: 2rem;
-            border-radius: 15px 15px 0 0;
+            padding: 2.5rem 2rem 2rem;
+            border-radius: 8px 8px 0 0;
             text-align: center;
+            border-bottom: 3px solid #34495e;
         }
         .login-body {
-            padding: 2rem;
+            padding: 2.5rem 2rem;
+        }
+        .form-label {
+            color: #2c3e50;
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
         }
         .form-control {
-            border-radius: 10px;
-            border: 2px solid #e1e5e9;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
             padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
         }
         .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+            border-color: #5a6c7d;
+            box-shadow: 0 0 0 0.15rem rgba(44, 62, 80, 0.15);
         }
         .btn-login {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #2c3e50;
             border: none;
-            border-radius: 10px;
-            padding: 0.75rem 2rem;
-            font-weight: 600;
+            border-radius: 4px;
+            padding: 0.85rem 2rem;
+            font-weight: 500;
             width: 100%;
+            color: white;
+            transition: background-color 0.15s ease-in-out;
         }
         .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            background-color: #34495e;
+            color: white;
         }
         .alert {
-            border-radius: 10px;
-            border: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
         }
         .login-footer {
             text-align: center;
-            padding: 1rem 2rem 2rem;
+            padding: 1.5rem 2rem 2rem;
             color: #6c757d;
+            border-top: 1px solid #f0f0f0;
+            font-size: 0.85rem;
         }
         .logo {
             font-size: 2.5rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            color: #ecf0f1;
+        }
+        .login-header h4 {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            font-size: 1.5rem;
+        }
+        .login-header p {
+            color: #bdc3c7;
+            font-size: 0.9rem;
+        }
+        .info-card {
+            background: white;
+            border: 1px solid #e8ecef;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+        }
+        .info-card .card-title {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .info-card small {
+            color: #7f8c8d;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-6">
+            <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5">
                 <div class="card login-card">
                     <div class="login-header">
                         <div class="logo">
@@ -167,17 +205,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <!-- Información de usuarios de prueba -->
-                <div class="card mt-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);">
-                    <div class="card-body text-center">
-                        <h6 class="card-title text-white mb-2">Usuarios de Prueba</h6>
-                        <div class="row text-white">
-                            <div class="col-6">
-                                <strong>Administrador:</strong><br>
-                                <small>admin / password</small>
+                <div class="card mt-3 info-card">
+                    <div class="card-body">
+                        <h6 class="card-title text-center mb-3">Usuarios de Prueba</h6>
+                        <div class="row g-3">
+                            <div class="col-6 text-center">
+                                <div class="border rounded p-2 h-100">
+                                    <strong style="color: #2c3e50; font-size: 0.9rem;">Administrador</strong>
+                                    <hr class="my-2">
+                                    <small class="text-muted">admin / password</small>
+                                </div>
                             </div>
-                            <div class="col-6">
-                                <strong>Técnico:</strong><br>
-                                <small>tecnico1 / password</small>
+                            <div class="col-6 text-center">
+                                <div class="border rounded p-2 h-100">
+                                    <strong style="color: #2c3e50; font-size: 0.9rem;">Técnico</strong>
+                                    <hr class="my-2">
+                                    <small class="text-muted">tecnico1 / password</small>
+                                </div>
                             </div>
                         </div>
                     </div>

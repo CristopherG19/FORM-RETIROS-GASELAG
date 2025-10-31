@@ -83,16 +83,20 @@ function countRetirosImposibilidadSinFoto($pdo, $userId = null) {
                 WHERE r.medidor_retirado = 'NO'
                 AND (r.foto_imposibilidad IS NULL OR r.foto_imposibilidad = '')";
 
+        $params = [];
+
+        // SEGURIDAD: Usar prepared statements consistentemente
         // Aplicar filtro por usuario si es técnico y existe la columna
         if (isUser() && $userColumnExists) {
             if (!$userId) {
                 $userId = $_SESSION['user_id'];
             }
-            $sql .= " AND r.usuario_id = " . intval($userId);
+            $sql .= " AND r.usuario_id = ?";
+            $params[] = $userId;
         }
 
         $stmt = $pdo->prepare($sql);
-        $stmt->execute();
+        $stmt->execute($params);
         $result = $stmt->fetch();
         return $result['total'];
     } catch (Exception $e) {
@@ -146,6 +150,9 @@ function login($username, $password) {
 
             // Registrar login en auditoría
             logAudit(null, $user['id'], 'login', "Login exitoso desde IP: " . getClientIP());
+
+            // SEGURIDAD: Regenerar ID de sesión para prevenir session fixation
+            session_regenerate_id(true);
 
             // Guardar en sesión
             $_SESSION['user_id'] = $user['id'];

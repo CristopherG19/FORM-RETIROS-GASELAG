@@ -123,85 +123,166 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
+        /* Sidebar responsive */
+        @media (max-width: 767.98px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: -100%;
+                height: 100vh;
+                width: 280px;
+                z-index: 1050;
+                transition: left 0.3s ease;
+            }
+            .sidebar.show {
+                left: 0;
+            }
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 1040;
+            }
+            .sidebar-overlay.show {
+                display: block;
+            }
+        }
+        
+        /* Upload area mejorada */
         .upload-area {
-            border: 2px dashed #007bff;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            background: #f8f9fa;
-            transition: all 0.3s ease;
+            border: 3px dashed #dee2e6;
             cursor: pointer;
+            transition: all 0.3s ease;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         .upload-area:hover {
-            border-color: #0056b3;
-            background: #e3f2fd;
+            border-color: #0d6efd;
+            background-color: #f8f9fa;
         }
         .upload-area.dragover {
-            border-color: #28a745;
-            background: #d4edda;
+            border-color: #198754;
+            background-color: #d1e7dd;
         }
-        .method-card {
-            transition: transform 0.2s ease;
+        .upload-area.has-file {
+            border-color: #198754;
+            background-color: #d1e7dd;
         }
-        .method-card:hover {
-            transform: translateY(-2px);
-        }
+        
+        /* Progress bar container */
         .progress-container {
             display: none;
+        }
+        
+        /* Stats cards responsive SIN MOVIMIENTO */
+        .stat-card {
+            transition: box-shadow 0.2s ease;
+        }
+        .stat-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Método badge responsive */
+        @media (max-width: 575.98px) {
+            .method-badge {
+                display: block;
+                margin-top: 10px;
+            }
+        }
+        
+        /* File preview */
+        .file-preview {
+            display: none;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .file-preview.show {
+            display: block;
         }
     </style>
 </head>
 <body>
+    <!-- Overlay para sidebar en móvil -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+            <div class="col-md-3 col-lg-2 bg-light shadow-sm sidebar" id="sidebar" style="min-height: 100vh;">
                 <div class="position-sticky pt-3">
+                    <!-- Close button para móvil -->
+                    <button class="btn btn-close float-end d-md-none mb-3" id="closeSidebar"></button>
+                    
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link" href="../index.php">
-                                <i class="bi bi-house"></i> Inicio
+                            <a class="nav-link text-dark" href="../index.php">
+                                <i class="bi bi-house me-2"></i> Inicio
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="buscar_oc.php">
-                                <i class="bi bi-search"></i> Buscar OC
+                            <a class="nav-link text-dark" href="buscar_oc.php">
+                                <i class="bi bi-search me-2"></i> Buscar OC
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="consultar_retiros.php">
-                                <i class="bi bi-list-ul"></i> Consultar Retiros
+                            <a class="nav-link text-dark" href="consultar_retiros.php">
+                                <i class="bi bi-list-ul me-2"></i> Consultar Retiros
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link active" href="importar_datos.php">
-                                <i class="bi bi-upload"></i> Importar Datos
+                            <a class="nav-link active bg-dark text-white rounded" href="importar_datos.php">
+                                <i class="bi bi-upload me-2"></i> Importar Datos
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="exportar_excel.php">
-                                <i class="bi bi-download"></i> Exportar Excel
+                            <a class="nav-link text-dark" href="exportar_excel.php">
+                                <i class="bi bi-download me-2"></i> Exportar Excel
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="../logout.php">
-                                <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                            <a class="nav-link text-dark" href="../logout.php">
+                                <i class="bi bi-box-arrow-right me-2"></i> Cerrar Sesión
                             </a>
                         </li>
                     </ul>
                 </div>
-                </div>
+            </div>
 
             <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="bi bi-upload"></i> Importar Datos de Órdenes de Servicio
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="../index.php" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-left"></i> Volver al Inicio
-                        </a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-3 px-md-4 py-3 py-md-4">
+                <!-- Header con menú hamburguesa para móvil -->
+                <div class="bg-white rounded shadow-sm p-3 p-md-4 mb-3 mb-md-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <!-- Botón menú para móvil -->
+                            <button class="btn btn-light d-md-none me-2" id="toggleSidebar">
+                                <i class="bi bi-list fs-4"></i>
+                            </button>
+                            
+                            <div>
+                                <h1 class="h3 h-md-2 mb-1 mb-md-2">
+                                    <i class="bi bi-cloud-upload text-primary"></i> 
+                                    <span class="d-none d-sm-inline">Importar Órdenes de Servicio</span>
+                                    <span class="d-sm-none">Importar</span>
+                                </h1>
+                                <p class="text-muted mb-0 small d-none d-sm-block">Carga masiva de datos desde Excel o CSV</p>
+                            </div>
+                        </div>
+                        <div>
+                            <a href="../index.php" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-arrow-left"></i>
+                                <span class="d-none d-sm-inline"> Volver</span>
+                            </a>
+                        </div>
                     </div>
                 </div>
 
@@ -213,156 +294,266 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
                             </div>
                         <?php endif; ?>
 
-                <!-- Estadísticas -->
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="card bg-primary text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h5 class="card-title">Total de Registros</h5>
-                                        <h2 class="mb-0"><?php echo number_format($totalRegistros); ?></h2>
+                <!-- Estadísticas responsive -->
+                <div class="row g-2 g-md-3 mb-3 mb-md-4">
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <div class="card border-0 shadow-sm bg-primary text-white stat-card">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <p class="mb-1 small opacity-75">Total de Registros</p>
+                                        <h3 class="mb-0 fw-bold"><?php echo number_format($totalRegistros); ?></h3>
                                     </div>
-                                    <div class="align-self-center">
-                                        <i class="bi bi-database fs-1"></i>
+                                    <div>
+                                        <i class="bi bi-database fs-1 opacity-50"></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="card bg-success text-white">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between">
-                                    <div>
-                                        <h5 class="card-title">Sistema Actualizado</h5>
-                                        <p class="mb-0">Importación mejorada disponible</p>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <div class="card border-0 shadow-sm bg-success text-white stat-card">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <p class="mb-1 small opacity-75">Sistema</p>
+                                        <h5 class="mb-0 fw-bold">Actualizado</h5>
+                                        <small class="opacity-75">Listo para importar</small>
                                     </div>
-                                    <div class="align-self-center">
-                                        <i class="bi bi-check-circle fs-1"></i>
+                                    <div>
+                                        <i class="bi bi-check-circle fs-1 opacity-50"></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                        </div>
-
-                <!-- Métodos de Importación -->
-                <div class="row">
-                    <!-- Método 1: Plantilla Excel (Recomendado) -->
-                    <div class="col-md-6 mb-4">
-                        <div class="card method-card h-100">
-                            <div class="card-header bg-success text-white">
-                                <h5 class="mb-0">
-                                    <i class="bi bi-file-earmark-excel"></i> Método Recomendado: Plantilla Excel
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <p class="card-text">Descarga una plantilla Excel preconfigurada, completa los datos y súbela al sistema.</p>
-                                
-                            <div class="mb-3">
-                                    <h6>Pasos:</h6>
-                                    <ol class="small">
-                                        <li>Descarga la plantilla Excel</li>
-                                        <li>Completa los datos en la plantilla</li>
-                                        <li>Sube el archivo completado</li>
-                                        <li>Revisa los resultados</li>
-                                    </ol>
-                                </div>
-
-                                <div class="d-grid gap-2">
-                                    <a href="descargar_plantilla_excel.php" class="btn btn-success">
-                                        <i class="bi bi-file-earmark-spreadsheet"></i> Descargar Plantilla (.csv)
-                                    </a>
-                                    <small class="text-muted text-center">
-                                        <i class="bi bi-info-circle"></i> 
-                                        Archivo CSV con separador punto y coma (;)
-                                    </small>
-                                </div>
-                            </div>
-                                </div>
-                            </div>
-
-                    <!-- Método 2: Subir Archivo Excel -->
-                    <div class="col-md-6 mb-4">
-                        <div class="card method-card h-100">
-                            <div class="card-header bg-primary text-white">
-                                <h5 class="mb-0">
-                                    <i class="bi bi-cloud-upload"></i> Subir Archivo Excel
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <p class="card-text">Sube directamente un archivo CSV (.csv) con separador punto y coma (;) con los datos.</p>
-                                
-                                <form id="excelUploadForm" enctype="multipart/form-data">
-                                    <div class="upload-area" id="uploadArea">
-                                        <i class="bi bi-cloud-upload fs-1 text-muted"></i>
-                                        <h5 class="mt-3">Arrastra tu archivo aquí</h5>
-                                        <p class="text-muted">o haz clic para seleccionar</p>
-                                        <input type="file" id="excelFile" name="excel_file" accept=".csv" style="display: none;">
-                                        <div class="mt-2">
-                                            <small class="text-muted">Formato soportado: .csv con separador punto y coma (;) (máx. 10MB)</small>
-                                        </div>
+                    <div class="col-12 col-sm-12 col-lg-4">
+                        <div class="card border-0 shadow-sm bg-info text-white stat-card">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <p class="mb-1 small opacity-75">Formato</p>
+                                        <h5 class="mb-0 fw-bold">CSV / Excel</h5>
+                                        <small class="opacity-75">Separador: punto y coma</small>
                                     </div>
-                                    
-                                    <div class="progress-container mt-3">
-                                        <div class="progress">
-                                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-                                        </div>
-                                        <small class="text-muted">Procesando archivo...</small>
-                            </div>
-                        </form>
+                                    <div>
+                                        <i class="bi bi-file-earmark-spreadsheet fs-1 opacity-50"></i>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Método 3: Copiar y Pegar (Método Anterior) -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-warning text-dark">
-                                <h5 class="mb-0">
-                                    <i class="bi bi-clipboard"></i> Método Alternativo: Copiar y Pegar
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="alert alert-info">
-                                    <h6><i class="bi bi-info-circle"></i> Instrucciones:</h6>
-                                    <ol>
-                                        <li>Abra su archivo Excel con los datos de las órdenes de servicio</li>
-                                        <li><strong class="text-danger">Seleccione SOLO las filas de datos (NO incluya la fila de encabezados)</strong></li>
-                                        <li>Copie las filas seleccionadas (Ctrl+C o Cmd+C)</li>
-                                        <li>Pegue los datos en el área de texto a continuación</li>
-                                        <li>Haga clic en "Importar Datos"</li>
-                                    </ol>
-                                    
-                                    <div class="alert alert-warning mt-3">
-                                        <strong><i class="bi bi-exclamation-triangle"></i> Importante:</strong>
-                                        NO copie la primera fila (encabezados como "Item", "Orden de servicio", etc.). 
-                                        Solo copie las filas con los datos.
-                                    </div>
-                                    
-                                    <p><strong>Total de registros en base de datos: <?php echo number_format($totalRegistros); ?></strong></p>
-                                </div>
+                <!-- Métodos de Importación con Tabs -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0">
+                            <i class="bi bi-folder-plus"></i> Métodos de Importación
+                        </h5>
+                    </div>
+                    <div class="card-body p-0 p-md-3">
+                        <!-- Tabs de navegación -->
+                        <ul class="nav nav-tabs nav-fill border-bottom mb-3" id="importTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="plantilla-tab" data-bs-toggle="tab" data-bs-target="#plantilla" type="button" role="tab">
+                                    <i class="bi bi-file-earmark-arrow-down d-none d-md-inline"></i>
+                                    <span class="small">Plantilla</span>
+                                    <span class="badge bg-success ms-1 d-none d-lg-inline">Recomendado</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="subir-tab" data-bs-toggle="tab" data-bs-target="#subir" type="button" role="tab">
+                                    <i class="bi bi-cloud-upload d-none d-md-inline"></i>
+                                    <span class="small">Subir CSV</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="copiar-tab" data-bs-toggle="tab" data-bs-target="#copiar" type="button" role="tab">
+                                    <i class="bi bi-clipboard-data d-none d-md-inline"></i>
+                                    <span class="small">Copiar/Pegar</span>
+                                </button>
+                            </li>
+                        </ul>
 
-                                <form method="POST">
-                                    <div class="mb-3">
-                                        <label for="csv_data" class="form-label">Pegue las filas de datos del Excel aquí:</label>
-                                        <textarea class="form-control" id="csv_data" name="csv_data" rows="10" 
-                                                  placeholder="Pegue aquí SOLO las filas de datos (SIN encabezados)&#10;&#10;Ejemplo:&#10;00001	OC-00001	2024-12-13	1	Reclamo	6/01/2025	08:00	7/01/2025	10:00	ABC123	Cliente Ejemplo	Centro 001	REM001	Juan Pérez	Calle Principal 123	CUS001	CUP001	5367165	EA22282911	Marca Ejemplo	Modelo 001	2023	Fabricante Ejemplo	Nacional	Residencial	15	2.5	R160	10	50	1.5	Cert001	CERT001"></textarea>
+                        <!-- Contenido de los tabs -->
+                        <div class="tab-content" id="importTabContent">
+                            <!-- TAB 1: Descargar Plantilla -->
+                            <div class="tab-pane fade show active p-3" id="plantilla" role="tabpanel">
+                                <div class="row g-3">
+                                    <div class="col-lg-6 mb-3">
+                                        <div class="border rounded p-3 bg-light">
+                                            <h6 class="fw-bold text-success mb-3">
+                                                <i class="bi bi-list-check"></i> Pasos a seguir:
+                                            </h6>
+                                            <ol class="mb-0">
+                                                <li class="mb-2">Descarga la plantilla CSV</li>
+                                                <li class="mb-2">Abre con Excel o Google Sheets</li>
+                                                <li class="mb-2">Completa los datos en las columnas</li>
+                                                <li class="mb-2">Guarda el archivo como CSV</li>
+                                                <li>Sube el archivo en la pestaña "Subir CSV"</li>
+                                            </ol>
+                                        </div>
                                     </div>
                                     
-                                    <div class="alert alert-light">
-                                        <i class="bi bi-lightbulb"></i> <strong>Recuerda:</strong>
-                                        Copiar directamente desde Excel sin la fila de encabezados. 
-                                        Los datos deben estar separados por tabuladores.
+                                    <div class="col-lg-6">
+                                        <div class="text-center p-4 bg-success bg-opacity-10 rounded">
+                                            <i class="bi bi-file-earmark-arrow-down text-success" style="font-size: 5rem;"></i>
+                                            <h5 class="mt-3 mb-3">Plantilla Preconfigurada</h5>
+                                            <p class="text-muted small mb-4">
+                                                CSV con todos los campos necesarios y formato correcto
+                                            </p>
+                                            
+                                            <div class="d-grid gap-2">
+                                                <a href="descargar_plantilla_excel.php" class="btn btn-success btn-lg">
+                                                    <i class="bi bi-download me-2"></i>Descargar Plantilla
+                                                </a>
+                                                <div class="alert alert-info mb-0 text-start">
+                                                    <small>
+                                                        <i class="bi bi-info-circle"></i>
+                                                        <strong>Formato:</strong> CSV con separador punto y coma (;)
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    
-                                    <button type="submit" class="btn btn-warning btn-lg w-100">
-                                        <i class="bi bi-upload"></i> Importar Datos
-                                    </button>
-                                </form>
+                                </div>
+                            </div>
+
+                            <!-- TAB 2: Subir Archivo CSV -->
+                            <div class="tab-pane fade p-3" id="subir" role="tabpanel">
+                                <div class="row justify-content-center">
+                                    <div class="col-lg-8">
+                                        <form id="excelUploadForm" enctype="multipart/form-data">
+                                            <div class="upload-area p-4 p-md-5 rounded text-center bg-light" id="uploadArea">
+                                                <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 5rem;"></i>
+                                                <h5 class="mt-3">Arrastra tu archivo aquí</h5>
+                                                <p class="text-muted mb-3">o haz clic para seleccionar</p>
+                                                <input type="file" id="excelFile" name="excel_file" accept=".csv" style="display: none;">
+                                                <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
+                                                    <span class="badge bg-secondary p-2">
+                                                        <i class="bi bi-file-earmark-spreadsheet"></i> CSV separador ";"
+                                                    </span>
+                                                    <span class="badge bg-secondary p-2">
+                                                        <i class="bi bi-hdd"></i> Máx. 10MB
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- File preview -->
+                                            <div class="file-preview" id="filePreview">
+                                                <div class="d-flex align-items-center justify-content-between">
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="bi bi-file-earmark-check text-success fs-3 me-3"></i>
+                                                        <div>
+                                                            <strong id="fileName">archivo.csv</strong>
+                                                            <br>
+                                                            <small class="text-muted" id="fileSize">0 KB</small>
+                                                        </div>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" id="removeFile">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="progress-container mt-3">
+                                                <div class="progress mb-2" style="height: 25px;">
+                                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                                         role="progressbar" style="width: 0%">
+                                                        <span class="progress-text">0%</span>
+                                                    </div>
+                                                </div>
+                                                <div class="text-center">
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-hourglass-split"></i> Procesando archivo...
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </form>
+                                        
+                                        <div class="alert alert-info mt-3">
+                                            <h6 class="alert-heading"><i class="bi bi-lightbulb"></i> Consejo</h6>
+                                            <p class="mb-0 small">
+                                                Usa la plantilla CSV de la primera pestaña para asegurar que tu archivo 
+                                                tenga el formato correcto.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- TAB 3: Copiar y Pegar -->
+
+                            <div class="tab-pane fade p-3" id="copiar" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-lg-8 mx-auto">
+                                        <div class="alert alert-warning mb-3">
+                                            <h6 class="alert-heading">
+                                                <i class="bi bi-exclamation-triangle"></i> Importante
+                                            </h6>
+                                            <p class="mb-0 small">
+                                                NO copies la primera fila con encabezados. Solo copia las filas 
+                                                que contienen los datos reales de las órdenes.
+                                            </p>
+                                        </div>
+
+                                        <div class="accordion mb-3" id="instructionsAccordion">
+                                            <div class="accordion-item">
+                                                <h2 class="accordion-header">
+                                                    <button class="accordion-button collapsed" type="button" 
+                                                            data-bs-toggle="collapse" data-bs-target="#instructions">
+                                                        <i class="bi bi-info-circle me-2"></i>
+                                                        Ver instrucciones paso a paso
+                                                    </button>
+                                                </h2>
+                                                <div id="instructions" class="accordion-collapse collapse" 
+                                                     data-bs-parent="#instructionsAccordion">
+                                                    <div class="accordion-body">
+                                                        <ol class="mb-0">
+                                                            <li class="mb-2">Abre tu archivo Excel con los datos</li>
+                                                            <li class="mb-2">
+                                                                <strong class="text-danger">Selecciona SOLO las filas de datos</strong> 
+                                                                (sin encabezados)
+                                                            </li>
+                                                            <li class="mb-2">Copia las filas (Ctrl+C o Cmd+C)</li>
+                                                            <li class="mb-2">Pega en el área de texto de abajo</li>
+                                                            <li>Haz clic en "Importar Datos"</li>
+                                                        </ol>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <form method="POST">
+                                            <div class="mb-3">
+                                                <label for="csv_data" class="form-label fw-bold">
+                                                    <i class="bi bi-clipboard-data"></i> Área de Datos
+                                                </label>
+                                                <textarea class="form-control font-monospace" id="csv_data" 
+                                                          name="csv_data" rows="12" 
+                                                          placeholder="Pega aquí las filas copiadas desde Excel (sin encabezados)"></textarea>
+                                                <div class="form-text">
+                                                    <i class="bi bi-info-circle"></i> 
+                                                    Los datos se separan automáticamente por tabuladores (Tab)
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="alert alert-light">
+                                                <i class="bi bi-lightbulb text-warning"></i>
+                                                <strong>Consejo:</strong>
+                                                Al copiar desde Excel, los datos se separan automáticamente 
+                                                con el formato correcto.
+                                            </div>
+                                            
+                                            <div class="d-grid">
+                                                <button type="submit" class="btn btn-warning btn-lg">
+                                                    <i class="bi bi-upload me-2"></i>Importar Datos
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -373,90 +564,168 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Funcionalidad de subida de archivos
+        // ========== SIDEBAR RESPONSIVE ==========
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const toggleSidebar = document.getElementById('toggleSidebar');
+        const closeSidebar = document.getElementById('closeSidebar');
+
+        // Abrir sidebar
+        toggleSidebar?.addEventListener('click', () => {
+            sidebar.classList.add('show');
+            sidebarOverlay.classList.add('show');
+        });
+
+        // Cerrar sidebar
+        closeSidebar?.addEventListener('click', () => {
+            sidebar.classList.remove('show');
+            sidebarOverlay.classList.remove('show');
+        });
+
+        // Cerrar al hacer clic en overlay
+        sidebarOverlay?.addEventListener('click', () => {
+            sidebar.classList.remove('show');
+            sidebarOverlay.classList.remove('show');
+        });
+
+        // ========== UPLOAD FILE FUNCTIONALITY ==========
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('excelFile');
         const form = document.getElementById('excelUploadForm');
         const progressContainer = document.querySelector('.progress-container');
         const progressBar = document.querySelector('.progress-bar');
-        const progressText = document.querySelector('.progress-container small');
+        const progressText = document.querySelector('.progress-bar .progress-text');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeFile = document.getElementById('removeFile');
 
         // Click en área de subida
-        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea?.addEventListener('click', () => fileInput.click());
 
         // Drag and drop
-        uploadArea.addEventListener('dragover', (e) => {
+        uploadArea?.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
         });
 
-        uploadArea.addEventListener('dragleave', () => {
+        uploadArea?.addEventListener('dragleave', () => {
             uploadArea.classList.remove('dragover');
         });
 
-        uploadArea.addEventListener('drop', (e) => {
+        uploadArea?.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 fileInput.files = files;
-                handleFileUpload();
+                showFilePreview(files[0]);
             }
         });
 
         // Cambio de archivo
-        fileInput.addEventListener('change', handleFileUpload);
+        fileInput?.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                showFilePreview(e.target.files[0]);
+            }
+        });
 
+        // Remover archivo
+        removeFile?.addEventListener('click', () => {
+            fileInput.value = '';
+            filePreview.classList.remove('show');
+            uploadArea.classList.remove('has-file');
+        });
+
+        // Mostrar preview del archivo
+        function showFilePreview(file) {
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            filePreview.classList.add('show');
+            uploadArea.classList.add('has-file');
+            
+            // Auto-upload después de seleccionar
+            setTimeout(() => handleFileUpload(), 500);
+        }
+
+        // Formatear tamaño de archivo
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // ========== HANDLE FILE UPLOAD ==========
         function handleFileUpload() {
             const file = fileInput.files[0];
             if (!file) return;
 
             // Validar tipo de archivo (solo CSV)
             if (!file.name.match(/\.csv$/i)) {
-                alert('Tipo de archivo no válido. Use solo archivos CSV (.csv)');
+                alert('⚠️ Tipo de archivo no válido.\n\nPor favor, usa solo archivos CSV (.csv)');
+                fileInput.value = '';
+                filePreview.classList.remove('show');
+                uploadArea.classList.remove('has-file');
                 return;
             }
 
             // Validar tamaño (10MB)
             if (file.size > 10 * 1024 * 1024) {
-                alert('El archivo es demasiado grande. Máximo 10MB');
+                alert('⚠️ El archivo es demasiado grande.\n\nTamaño máximo: 10MB');
+                fileInput.value = '';
+                filePreview.classList.remove('show');
+                uploadArea.classList.remove('has-file');
                 return;
             }
 
             // Mostrar progreso
             progressContainer.style.display = 'block';
             progressBar.style.width = '0%';
+            if (progressText) progressText.textContent = '0%';
+            
+            // Simular progreso
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 5;
+                if (progress <= 90) {
+                    progressBar.style.width = progress + '%';
+                    if (progressText) progressText.textContent = progress + '%';
+                }
+            }, 100);
 
             // Subir archivo
             const formData = new FormData();
-                formData.append('excel_file', file);
-                
-                fetch('procesar_excel.php', {
+            formData.append('excel_file', file);
+            
+            fetch('procesar_excel.php', {
                 method: 'POST',
                 body: formData
             })
             .then(response => response.json())
             .then(data => {
+                clearInterval(progressInterval);
                 progressBar.style.width = '100%';
-                progressText.textContent = 'Completado';
+                if (progressText) progressText.textContent = '100%';
                 
                 setTimeout(() => {
                     progressContainer.style.display = 'none';
                     
                     if (data.success) {
-                        let message = `Importación completada!\n\n`;
-                        message += `Registros importados: ${data.success_count}\n`;
-                        message += `Errores: ${data.error_count}\n\n`;
+                        let message = '✅ ¡Importación completada!\n\n';
+                        message += `📊 Registros importados: ${data.success_count}\n`;
+                        message += `❌ Errores: ${data.error_count}\n\n`;
                         
                         if (data.debug_info) {
-                            message += `Información de depuración:\n`;
-                            message += `- Filas procesadas: ${data.debug_info.total_rows_processed}\n`;
-                            message += `- Columnas esperadas: ${data.debug_info.expected_columns}\n`;
-                            message += `- Columnas encontradas: ${data.debug_info.actual_columns_in_header}\n\n`;
+                            message += `ℹ️ Información adicional:\n`;
+                            message += `  • Filas procesadas: ${data.debug_info.total_rows_processed}\n`;
+                            message += `  • Columnas esperadas: ${data.debug_info.expected_columns}\n`;
+                            message += `  • Columnas encontradas: ${data.debug_info.actual_columns_in_header}\n\n`;
                         }
                         
                         if (data.error_details && data.error_details.length > 0) {
-                            message += `Detalles de errores:\n`;
+                            message += `⚠️ Detalles de errores:\n`;
                             message += data.error_details.slice(0, 5).join('\n');
                             if (data.error_details.length > 5) {
                                 message += `\n... y ${data.error_details.length - 5} errores más`;
@@ -466,14 +735,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
                         alert(message);
                         location.reload();
                     } else {
-                        alert('Error: ' + data.error);
+                        alert('❌ Error: ' + data.error);
+                        filePreview.classList.remove('show');
+                        uploadArea.classList.remove('has-file');
                     }
                 }, 500);
             })
             .catch(error => {
+                clearInterval(progressInterval);
                 console.error('Error:', error);
-                alert('Error al procesar el archivo');
+                alert('❌ Error al procesar el archivo.\n\nPor favor, intenta nuevamente.');
                 progressContainer.style.display = 'none';
+                filePreview.classList.remove('show');
+                uploadArea.classList.remove('has-file');
             });
         }
     </script>
