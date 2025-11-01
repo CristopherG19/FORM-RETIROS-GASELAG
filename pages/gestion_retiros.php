@@ -167,10 +167,9 @@ try {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         .retiro-card {
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: box-shadow 0.2s;
         }
         .retiro-card:hover {
-            transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         .status-badge {

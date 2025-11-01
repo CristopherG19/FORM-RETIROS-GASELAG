@@ -25,9 +25,18 @@ if (!canAccessRetiro($retiroId) && !isAdmin()) {
     exit;
 }
 
-// Procesar la imagen
+// SEGURIDAD: Procesar y validar la imagen
 $uploadDir = '../uploads/';
 $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+$maxFileSize = 10 * 1024 * 1024; // 10MB
+
+// Verificar tamaño primero
+if ($fotoFile['size'] > $maxFileSize) {
+    echo '<div class="alert alert-danger">Error: El archivo es demasiado grande (máximo 10MB)</div>';
+    exit;
+}
+
+// Validar tipo MIME real del archivo
 $fileInfo = finfo_open(FILEINFO_MIME_TYPE);
 $mimeType = finfo_file($fileInfo, $fotoFile['tmp_name']);
 finfo_close($fileInfo);
@@ -37,13 +46,16 @@ if (!in_array($mimeType, $allowedTypes)) {
     exit;
 }
 
-if ($fotoFile['size'] > 10 * 1024 * 1024) { // 10MB máximo
-    echo '<div class="alert alert-danger">Error: El archivo es demasiado grande (máximo 10MB)</div>';
-    exit;
-}
+// Obtener extensión segura basada en MIME type
+$extensionMap = [
+    'image/jpeg' => 'jpg',
+    'image/png' => 'png',
+    'image/gif' => 'gif',
+    'image/webp' => 'webp'
+];
+$extension = $extensionMap[$mimeType] ?? 'jpg';
 
-// Generar nombre único para el archivo
-$extension = pathinfo($fotoFile['name'], PATHINFO_EXTENSION);
+// Generar nombre único para el archivo (sanitizado)
 $timestamp = date('Ymd_His');
 $randomStr = substr(md5(uniqid()), 0, 8);
 $newFileName = "evidencia_{$retiroId}_{$timestamp}_{$randomStr}.{$extension}";

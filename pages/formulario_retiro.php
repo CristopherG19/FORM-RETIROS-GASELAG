@@ -1,5 +1,6 @@
 <?php
 require_once '../config/database.php';
+require_once '../config/AppConfig.php';
 
 // Verificar autenticación (todos los usuarios)
 requireRole(['admin', 'user']);
@@ -89,16 +90,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Procesar foto de imposibilidad
         $fotoPath = null;
         if (isset($_FILES['foto_imposibilidad']) && $_FILES['foto_imposibilidad']['error'] === UPLOAD_ERR_OK) {
-            $extension = pathinfo($_FILES['foto_imposibilidad']['name'], PATHINFO_EXTENSION);
+            // SEGURIDAD: Validar tipo MIME real del archivo
+            $allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+            $maxFileSize = 10 * 1024 * 1024; // 10MB
+            
+            // Verificar tamaño
+            if ($_FILES['foto_imposibilidad']['size'] > $maxFileSize) {
+                throw new Exception("El archivo es demasiado grande (máximo 10MB)");
+            }
+            
+            // Verificar tipo MIME real usando finfo
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeType = finfo_file($finfo, $_FILES['foto_imposibilidad']['tmp_name']);
+            finfo_close($finfo);
+            
+            if (!in_array($mimeType, $allowedMimeTypes)) {
+                throw new Exception("Tipo de archivo no permitido. Solo se aceptan imágenes (JPEG, PNG, GIF, WebP)");
+            }
+            
+            // Obtener extensión segura basada en MIME type
+            $extensionMap = [
+                'image/jpeg' => 'jpg',
+                'image/jpg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp'
+            ];
+            $extension = $extensionMap[$mimeType] ?? 'jpg';
             
             // Formato: OC-xxx_NumSuministro_NumSerie_FechaHora.extension
-            $numSuministro = !empty($orden['num_suministro']) ? $orden['num_suministro'] : 'SIN_SUMINISTRO';
-            $numSerie = !empty($orden['num_serie_medidor']) ? $orden['num_serie_medidor'] : 'SIN_SERIE';
+            $numSuministro = !empty($orden['num_suministro']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $orden['num_suministro']) : 'SIN_SUMINISTRO';
+            $numSerie = !empty($orden['num_serie_medidor']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $orden['num_serie_medidor']) : 'SIN_SERIE';
             $fechaHora = date('Ymd_His'); // Formato: 20251025_143022
             
             $fileName = $currentOC . '_' . $numSuministro . '_' . $numSerie . '_' . $fechaHora . '.' . $extension;
             $fotoPath = $uploadDir . $fileName;
-            move_uploaded_file($_FILES['foto_imposibilidad']['tmp_name'], $fotoPath);
+            
+            if (!move_uploaded_file($_FILES['foto_imposibilidad']['tmp_name'], $fotoPath)) {
+                throw new Exception("Error al guardar el archivo");
+            }
+            
             $fotoPath = 'uploads/' . $fileName; // Ruta relativa para BD
         }
         
@@ -328,86 +359,282 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
-        .section-title {
-            background-color: #f8f9fa;
-            padding: 10px 15px;
-            border-left: 4px solid #0d6efd;
-            margin: 20px 0 15px 0;
-            font-weight: bold;
+        /* Hero gradient header */
+        .hero-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-
-        /* Asegurar que los radio buttons sean visibles y funcionales */
+        
+        /* Section titles ULTRA SUAVES */
+        .section-title {
+            background: linear-gradient(to right, #f8f9fa, #ffffff);
+            padding: 12px 20px;
+            border-left: 4px solid #a8b3d9;
+            margin: 25px 0 20px 0;
+            font-weight: 600;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            transition: all 0.3s ease;
+        }
+        .section-title:hover {
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.08);
+        }
+        
+        /* Card hover effects SIN MOVIMIENTO */
+        .info-card, .form-card {
+            transition: box-shadow 0.3s ease;
+        }
+        .info-card:hover, .form-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        }
+        
+        /* Progress card SIN MOVIMIENTO */
+        .progress-card {
+            transition: box-shadow 0.3s ease;
+        }
+        .progress-card:hover {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important;
+        }
+        
+        /* Radio buttons visibles y funcionales */
         .form-check-input {
             opacity: 1 !important;
             visibility: visible !important;
             pointer-events: auto !important;
             cursor: pointer !important;
+            width: 1.2em;
+            height: 1.2em;
+            margin-top: 0.15em;
         }
-
         .form-check-input:checked {
-            background-color: #0d6efd !important;
-            border-color: #0d6efd !important;
+            background-color: #667eea !important;
+            border-color: #667eea !important;
         }
-
+        .form-check-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
         .form-check-label {
             cursor: pointer !important;
             user-select: none;
+            padding-left: 0.5rem;
         }
-
-        /* Debug para radio buttons */
-        input[name="medidor_retirado"] {
-            cursor: pointer !important;
-            opacity: 1 !important;
+        
+        /* Form inputs con efecto MÁS SUAVE */
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
         }
-
-        /* Asegurar que el div de campos sea visible */
+        
+        /* File input mejorado */
+        .form-control[type="file"] {
+            cursor: pointer;
+            padding: 0.6rem 0.75rem;
+        }
+        
+        /* Badge pulse */
+        .badge-pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* Botones SIN MOVIMIENTO */
+        .btn-submit {
+            transition: box-shadow 0.3s ease;
+        }
+        .btn-submit:hover {
+            box-shadow: 0 3px 8px rgba(102, 126, 234, 0.2);
+        }
+        
+        /* Acordeones con colores suaves */
+        .accordion-button {
+            background-color: #f8f9fa;
+            color: #495057;
+            font-weight: 500;
+        }
+        .accordion-button:not(.collapsed) {
+            background-color: #e9ecef;
+            color: #495057;
+            box-shadow: none;
+        }
+        .accordion-button:focus {
+            border-color: #a8b3d9;
+            box-shadow: 0 0 0 0.2rem rgba(168, 179, 217, 0.15);
+        }
+        
+        /* Alert con bordes suaves */
+        .alert {
+            border-radius: 8px;
+            border: none;
+        }
+        
+        /* Asegurar campos visibles */
         #campos_retiro {
             min-height: 200px;
+        }
+        
+        /* Progress bar animado */
+        .progress {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            transition: width 0.6s ease;
+        }
+        
+        /* Form groups con spacing */
+        .form-group-spacing {
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 767.98px) {
+            .hero-header {
+                padding: 1.5rem 0;
+            }
+            .hero-header h1 {
+                font-size: 1.5rem;
+            }
+            .section-title {
+                font-size: 0.95rem;
+                padding: 10px 15px;
+            }
         }
     </style>
 </head>
 <body class="bg-light">
-    <div class="container py-4">
-        <div class="mb-3">
-            <a href="vista_previa.php" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left"></i> Volver a Vista Previa
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-3 px-md-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="../index.php">
+                <i class="bi bi-speedometer2 me-2 fs-4"></i>
+                <span class="d-none d-sm-inline">GASELAG</span>
+            </a>
+            <a href="vista_previa.php" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-arrow-left"></i>
+                <span class="d-none d-sm-inline"> Vista Previa</span>
             </a>
         </div>
+    </nav>
 
-        <!-- Progreso -->
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="mb-0">Progreso: OC <?= $currentIndex + 1 ?> de <?= $totalOCs ?></h6>
-                    <span class="badge bg-secondary"><?= round((($currentIndex + 1) / $totalOCs) * 100) ?>%</span>
+    <!-- Hero Header -->
+    <div class="hero-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-10 mx-auto text-center">
+                    <h1 class="fw-bold mb-2">
+                        <i class="bi bi-clipboard-data me-2"></i>
+                        Formulario de Retiro
+                    </h1>
+                    <p class="mb-3 opacity-90">Orden de Servicio: <strong><?= htmlspecialchars($currentOC) ?></strong></p>
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        <span class="badge bg-light text-dark px-3 py-2">
+                            <i class="bi bi-list-ol me-1"></i>
+                            OC <?= $currentIndex + 1 ?> de <?= $totalOCs ?>
+                        </span>
+                        <span class="badge bg-warning text-dark px-3 py-2 badge-pulse">
+                            <i class="bi bi-hourglass-split me-1"></i>
+                            <?= round((($currentIndex + 1) / $totalOCs) * 100) ?>% Completado
+                        </span>
+                        <?php if ($totalOCs - $currentIndex > 1): ?>
+                            <span class="badge bg-info px-3 py-2">
+                                <i class="bi bi-arrow-right me-1"></i>
+                                <?= $totalOCs - $currentIndex - 1 ?> pendiente<?= ($totalOCs - $currentIndex - 1) > 1 ? 's' : '' ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
                 </div>
-                <div class="progress" style="height: 20px;">
-                    <div class="progress-bar" role="progressbar" 
-                         style="width: <?= (($currentIndex + 1) / $totalOCs) * 100 ?>%">
+            </div>
+        </div>
+    </div>
+
+    <div class="container pb-4">
+        <!-- Barra de progreso visual -->
+        <div class="card border-0 shadow-sm mb-4 progress-card">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted fw-bold">
+                        <i class="bi bi-speedometer2"></i> Progreso General
+                    </small>
+                    <span class="badge bg-primary"><?= round((($currentIndex + 1) / $totalOCs) * 100) ?>%</span>
+                </div>
+                <div class="progress" style="height: 25px;">
+                    <div class="progress-bar bg-gradient" role="progressbar" 
+                         style="width: <?= (($currentIndex + 1) / $totalOCs) * 100 ?>%; background: linear-gradient(to right, #667eea, #764ba2);">
+                        <span class="fw-bold"><?= $currentIndex + 1 ?> / <?= $totalOCs ?></span>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Información de la OC -->
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0">
-                    <i class="bi bi-info-circle text-primary"></i>
-                    Información de la Orden: <?= htmlspecialchars($currentOC) ?>
-                </h5>
+        <div class="card border-0 shadow-sm mb-4 info-card">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle-fill fs-4 me-2"></i>
+                    <h5 class="mb-0">Información de la Orden de Servicio</h5>
+                </div>
             </div>
             <div class="card-body">
-                <div class="row">
+                <div class="row g-3">
                     <div class="col-md-6">
-                        <p><strong>N° Suministro:</strong> <?= htmlspecialchars($orden['num_suministro']) ?></p>
-                        <p><strong>Usuario:</strong> <?= htmlspecialchars($orden['usuario_reclamante']) ?></p>
-                        <p><strong>Dirección:</strong> <?= htmlspecialchars($orden['direccion']) ?></p>
+                        <div class="p-3 bg-light rounded">
+                            <small class="text-muted d-block mb-1">
+                                <i class="bi bi-tag-fill text-primary"></i> Orden de Servicio
+                            </small>
+                            <strong class="fs-5 text-primary"><?= htmlspecialchars($currentOC) ?></strong>
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <p><strong>N° Serie Medidor:</strong> <?= htmlspecialchars($orden['num_serie_medidor']) ?></p>
-                        <p><strong>Marca:</strong> <?= htmlspecialchars($orden['marca_medidor']) ?></p>
-                        <p><strong>Modelo:</strong> <?= htmlspecialchars($orden['modelo_medidor']) ?></p>
+                        <div class="p-3 bg-light rounded">
+                            <small class="text-muted d-block mb-1">
+                                <i class="bi bi-hash text-info"></i> N° Suministro
+                            </small>
+                            <strong><?= htmlspecialchars($orden['num_suministro']) ?></strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded">
+                            <small class="text-muted d-block mb-1">
+                                <i class="bi bi-person-badge text-success"></i> Usuario Reclamante
+                            </small>
+                            <strong><?= htmlspecialchars($orden['usuario_reclamante']) ?></strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded">
+                            <small class="text-muted d-block mb-1">
+                                <i class="bi bi-geo-alt-fill text-danger"></i> Dirección
+                            </small>
+                            <strong><?= htmlspecialchars($orden['direccion']) ?></strong>
+                        </div>
+                    </div>
+                </div>
+                <hr class="my-3">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">
+                            <i class="bi bi-upc-scan text-warning"></i> N° Serie Medidor
+                        </small>
+                        <strong><?= htmlspecialchars($orden['num_serie_medidor']) ?></strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">
+                            <i class="bi bi-bookmark-star text-info"></i> Marca
+                        </small>
+                        <strong><?= htmlspecialchars($orden['marca_medidor']) ?></strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">
+                            <i class="bi bi-box-seam text-secondary"></i> Modelo
+                        </small>
+                        <strong><?= htmlspecialchars($orden['modelo_medidor']) ?></strong>
                     </div>
                 </div>
             </div>
@@ -415,17 +642,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Formulario de Retiro -->
         <form method="POST" enctype="multipart/form-data" id="retiroForm">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0">
-                        <i class="bi bi-clipboard-check text-primary"></i>
-                        Formulario de Retiro de Medidor
-                    </h5>
+            <div class="card border-0 shadow-sm form-card">
+                <div class="card-header bg-success text-white">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-clipboard-check-fill fs-4 me-2"></i>
+                        <h5 class="mb-0">Formulario de Registro de Retiro</h5>
+                    </div>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
                     <?php if ($message): ?>
-                        <div class="alert alert-<?= $messageType ?> alert-dismissible fade show">
-                            <?= $message ?>
+                        <div class="alert alert-<?= e($messageType) ?> alert-dismissible fade show border-0 shadow-sm">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-<?= $messageType === 'danger' ? 'exclamation-triangle' : ($messageType === 'warning' ? 'exclamation-circle' : 'info-circle') ?>-fill fs-4 me-3"></i>
+                                <div class="flex-grow-1">
+                                    <?= eSafe($message) ?>
+                                </div>
+                            </div>
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     <?php endif; ?>
@@ -667,32 +899,110 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <hr class="my-4">
 
                     <!-- Botones de navegación -->
-                    <div class="row">
-                        <div class="col-md-6 mb-2">
+                    <div class="row g-2 g-md-3">
+                        <div class="col-12 col-md-4">
                             <?php if ($currentIndex > 0): ?>
                                 <a href="?index=<?= $currentIndex - 1 ?>" class="btn btn-outline-secondary w-100">
-                                    <i class="bi bi-arrow-left"></i> OC Anterior
+                                    <i class="bi bi-arrow-left-circle"></i>
+                                    <span class="d-none d-sm-inline">OC Anterior</span>
+                                    <span class="d-sm-none">Anterior</span>
+                                </a>
+                            <?php else: ?>
+                                <a href="vista_previa.php" class="btn btn-outline-secondary w-100">
+                                    <i class="bi bi-arrow-left-circle"></i>
+                                    <span class="d-none d-sm-inline">Vista Previa</span>
+                                    <span class="d-sm-none">Volver</span>
                                 </a>
                             <?php endif; ?>
                         </div>
-                        <div class="col-md-3 mb-2">
-                            <button type="button" class="btn btn-info w-100" onclick="debugFormulario()">
-                                <i class="bi bi-bug"></i> Debug
-                            </button>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <button type="submit" class="btn btn-success w-100 btn-lg">
+                        <div class="col-12 col-md-8">
+                            <button type="submit" class="btn btn-success w-100 btn-lg btn-submit shadow">
                                 <?php if ($currentIndex < $totalOCs - 1): ?>
-                                    Guardar y Continuar <i class="bi bi-arrow-right"></i>
+                                    <i class="bi bi-save me-2"></i>
+                                    Guardar y Continuar
+                                    <i class="bi bi-arrow-right-circle ms-2"></i>
                                 <?php else: ?>
-                                    Guardar y Finalizar <i class="bi bi-check-circle"></i>
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                    Guardar y Finalizar
                                 <?php endif; ?>
                             </button>
                         </div>
                     </div>
+
+                    <!-- Botón debug (solo visible en desarrollo) -->
+                    <?php if (isset($_GET['debug'])): ?>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-sm btn-outline-info w-100" onclick="debugFormulario()">
+                                <i class="bi bi-bug"></i> Modo Debug
+                            </button>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </form>
+
+        <!-- Ayuda rápida colapsable -->
+        <div class="accordion mt-4" id="accordionAyuda">
+            <div class="accordion-item border-0 shadow-sm">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                            data-bs-target="#collapseAyuda" aria-expanded="false">
+                        <i class="bi bi-lightbulb me-2 text-muted"></i>
+                        <span class="text-muted">Ayuda Rápida - ¿Cómo completar el formulario?</span>
+                    </button>
+                </h2>
+                <div id="collapseAyuda" class="accordion-collapse collapse" data-bs-parent="#accordionAyuda">
+                    <div class="accordion-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-check-circle text-success me-3 fs-5 opacity-75"></i>
+                                    <div>
+                                        <strong class="d-block mb-1">¿Se retiró el medidor?</strong>
+                                        <small class="text-muted">
+                                            Selecciona "SÍ" si lograste retirar el medidor y completa todos los datos técnicos.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-x-circle text-danger me-3 fs-5 opacity-75"></i>
+                                    <div>
+                                        <strong class="d-block mb-1">¿No se pudo retirar?</strong>
+                                        <small class="text-muted">
+                                            Selecciona "NO", indica el motivo de imposibilidad y adjunta foto de evidencia.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-camera text-info me-3 fs-5 opacity-75"></i>
+                                    <div>
+                                        <strong class="d-block mb-1">Evidencia Fotográfica</strong>
+                                        <small class="text-muted">
+                                            Toma fotos claras y nítidas. La evidencia es fundamental para el proceso.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-save text-warning me-3 fs-5 opacity-75"></i>
+                                    <div>
+                                        <strong class="d-block mb-1">Guardar Progreso</strong>
+                                        <small class="text-muted">
+                                            Al guardar, avanzarás a la siguiente OC o finalizarás el proceso.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
