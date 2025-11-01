@@ -4,6 +4,11 @@
  * GASELAG - Sistema de Retiros de Medidores
  */
 
+// Incluir clases de seguridad
+require_once __DIR__ . '/SecurityConfig.php';
+require_once __DIR__ . '/PasswordPolicy.php';
+require_once __DIR__ . '/RateLimiter.php';
+
 // Configuración de base de datos
 define('DB_HOST', 'localhost');
 define('DB_PORT', '3307');  // Puerto personalizado de MySQL
@@ -29,6 +34,11 @@ function getConnection() {
     }
 }
 
+// Cargar módulos de seguridad
+require_once __DIR__ . '/SecurityConfig.php';
+require_once __DIR__ . '/PasswordPolicy.php';
+require_once __DIR__ . '/RateLimiter.php';
+
 // Iniciar sesión si no está iniciada
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -37,6 +47,11 @@ if (session_status() === PHP_SESSION_NONE) {
 // Generar ID de sesión único si no existe
 if (!isset($_SESSION['session_id'])) {
     $_SESSION['session_id'] = uniqid('session_', true);
+}
+
+// Inicializar last_activity para control de timeout
+if (!isset($_SESSION['last_activity'])) {
+    $_SESSION['last_activity'] = time();
 }
 
 // Función para identificar retiros sin evidencia fotográfica
@@ -126,12 +141,28 @@ function isUser() {
     return getUserRole() === 'user';
 }
 
-// Función para hacer login
+// Función para hacer login con seguridad mejorada
 function login($username, $password) {
     $pdo = getConnection();
+    $ip = getClientIP();
+    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
 
     try {
-        $sql = "SELECT id, username, password, nombre_completo, email, rol, estado
+        // PASO 1: Verificar bloqueo de cuenta
+        $blockStatus = isAccountBlocked($username, $ip);
+        if ($blockStatus['blocked']) {
+            recordLoginAttempt($username, $ip, false, $userAgent);
+            return [
+                'success' => false,
+                'error' => $blockStatus['reason'],
+                'blocked' => true,
+                'remaining' => $blockStatus['remaining']
+            ];
+        }
+
+        // PASO 2: Buscar usuario
+        $sql = "SELECT id, username, password, nombre_completo, email, rol, estado, 
+                       force_password_change, session_timeout
                 FROM usuarios
                 WHERE username = :username AND estado = 'activo'";
 
@@ -141,15 +172,26 @@ function login($username, $password) {
 
         $user = $stmt->fetch();
 
+        // PASO 3: Verificar credenciales
         if ($user && password_verify($password, $user['password'])) {
-            // Actualizar último login
-            $updateSql = "UPDATE usuarios SET ultimo_login = NOW() WHERE id = :id";
+            // Login exitoso
+            
+            // Actualizar datos del usuario
+            $updateSql = "UPDATE usuarios 
+                         SET ultimo_login = NOW(), 
+                             last_activity = NOW(),
+                             intentos_fallidos = 0,
+                             bloqueado_hasta = NULL
+                         WHERE id = :id";
             $updateStmt = $pdo->prepare($updateSql);
             $updateStmt->bindParam(':id', $user['id']);
             $updateStmt->execute();
 
-            // Registrar login en auditoría
-            logAudit(null, $user['id'], 'login', "Login exitoso desde IP: " . getClientIP());
+            // Registrar intento exitoso
+            recordLoginAttempt($username, $ip, true, $userAgent);
+
+            // Registrar en auditoría
+            logAudit(null, $user['id'], 'login', "Login exitoso desde IP: $ip");
 
             // SEGURIDAD: Regenerar ID de sesión para prevenir session fixation
             session_regenerate_id(true);
@@ -159,16 +201,40 @@ function login($username, $password) {
             $_SESSION['username'] = $user['username'];
             $_SESSION['user_role'] = $user['rol'];
             $_SESSION['nombre_completo'] = $user['nombre_completo'];
+            $_SESSION['session_timeout'] = $user['session_timeout'];
+            $_SESSION['last_activity'] = time();
+            $_SESSION['login_time'] = time();
+            $_SESSION['device_fingerprint'] = getDeviceFingerprint();
 
-            return true;
+            // Registrar dispositivo
+            registerDevice($user['id'], getDeviceFingerprint(), $userAgent, $ip);
+
+            return [
+                'success' => true,
+                'force_password_change' => (bool)$user['force_password_change'],
+                'user_role' => $user['rol']
+            ];
         }
 
-        // Registrar intento fallido en auditoría
-        logAudit(null, null, 'login', "Intento fallido de login para usuario: $username desde IP: " . getClientIP());
-        return false;
+        // Login fallido
+        recordLoginAttempt($username, $ip, false, $userAgent);
+        logAudit(null, null, 'login', "Intento fallido de login para usuario: $username desde IP: $ip");
+        
+        // Verificar intentos restantes
+        $blockStatus = isAccountBlocked($username, $ip);
+        
+        return [
+            'success' => false,
+            'error' => 'Usuario o contraseña incorrectos',
+            'attempts_left' => $blockStatus['attempts_left'] ?? null
+        ];
+        
     } catch (PDOException $e) {
         error_log("Error en login: " . $e->getMessage());
-        return false;
+        return [
+            'success' => false,
+            'error' => 'Error del sistema. Intente nuevamente'
+        ];
     }
 }
 
@@ -351,7 +417,7 @@ function getUserRetiros($userId = null, $includeInactiveUsers = false) {
 // ===== SISTEMA DE AUDITORÍA =====
 
 // Función para registrar acciones en auditoría
-function logAudit($retiroId = null, $userId = null, $action, $details = '', $ordenServicio = null) {
+function logAudit($retiroId, $userId, $action, $details = '', $ordenServicio = null) {
     if (!$userId) {
         $userId = $_SESSION['user_id'] ?? null;
     }
@@ -1210,6 +1276,200 @@ function getEstadisticasCumplimientoEvidencia($userId = null) {
         error_log("Error al obtener estadísticas de cumplimiento: " . $e->getMessage());
         return null;
     }
+}
+
+// ===== FUNCIONES DE SEGURIDAD ADICIONALES =====
+
+/**
+ * Generar fingerprint único del dispositivo
+ * @return string
+ */
+function getDeviceFingerprint() {
+    $components = [
+        $_SERVER['HTTP_USER_AGENT'] ?? '',
+        $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '',
+        $_SERVER['HTTP_ACCEPT_ENCODING'] ?? ''
+    ];
+    
+    return hash('sha256', implode('|', $components));
+}
+
+/**
+ * Registrar dispositivo autorizado
+ * @param int $userId
+ * @param string $fingerprint
+ * @param string $userAgent
+ * @param string $ip
+ */
+function registerDevice($userId, $fingerprint, $userAgent, $ip) {
+    try {
+        $pdo = getConnection();
+        
+        // Verificar si ya existe
+        $stmt = $pdo->prepare("
+            SELECT id FROM dispositivos_autorizados 
+            WHERE usuario_id = ? AND device_fingerprint = ?
+        ");
+        $stmt->execute([$userId, $fingerprint]);
+        
+        if ($stmt->fetch()) {
+            // Actualizar último uso
+            $pdo->prepare("
+                UPDATE dispositivos_autorizados 
+                SET ultimo_uso = NOW(), ip_address = ? 
+                WHERE usuario_id = ? AND device_fingerprint = ?
+            ")->execute([$ip, $userId, $fingerprint]);
+        } else {
+            // Detectar tipo de dispositivo
+            $deviceType = detectDeviceType($userAgent);
+            $deviceName = getDeviceName($userAgent);
+            
+            // Registrar nuevo dispositivo
+            $pdo->prepare("
+                INSERT INTO dispositivos_autorizados 
+                (usuario_id, device_fingerprint, device_name, device_type, user_agent, ip_address) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            ")->execute([$userId, $fingerprint, $deviceName, $deviceType, $userAgent, $ip]);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error registrando dispositivo: " . $e->getMessage());
+    }
+}
+
+/**
+ * Detectar tipo de dispositivo
+ */
+function detectDeviceType($userAgent) {
+    if (preg_match('/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/i', $userAgent)) {
+        return 'mobile';
+    }
+    if (preg_match('/tablet|ipad|playbook|silk/i', $userAgent)) {
+        return 'tablet';
+    }
+    return 'desktop';
+}
+
+/**
+ * Obtener nombre del dispositivo
+ */
+function getDeviceName($userAgent) {
+    if (preg_match('/iPhone/', $userAgent)) return 'iPhone';
+    if (preg_match('/iPad/', $userAgent)) return 'iPad';
+    if (preg_match('/Android/', $userAgent)) {
+        if (preg_match('/Mobile/', $userAgent)) return 'Android Phone';
+        return 'Android Tablet';
+    }
+    if (preg_match('/Windows/', $userAgent)) return 'Windows PC';
+    if (preg_match('/Macintosh/', $userAgent)) return 'Mac';
+    if (preg_match('/Linux/', $userAgent)) return 'Linux PC';
+    
+    return 'Dispositivo Desconocido';
+}
+
+/**
+ * Verificar timeout de sesión
+ * @return bool true si la sesión expiró
+ */
+function checkSessionTimeout() {
+    if (!isLoggedIn()) {
+        return false;
+    }
+    
+    $lastActivity = $_SESSION['last_activity'] ?? 0;
+    $timeout = $_SESSION['session_timeout'] ?? SESSION_TIMEOUT_USER;
+    $now = time();
+    
+    if (($now - $lastActivity) > $timeout) {
+        // Sesión expirada
+        logAudit(null, $_SESSION['user_id'], 'logout', "Sesión expirada por inactividad");
+        logout();
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Actualizar última actividad
+ */
+function updateLastActivity() {
+    if (isLoggedIn()) {
+        $_SESSION['last_activity'] = time();
+        
+        // Actualizar también en base de datos cada 5 minutos
+        $lastDbUpdate = $_SESSION['last_db_activity_update'] ?? 0;
+        if ((time() - $lastDbUpdate) > 300) { // 5 minutos
+            try {
+                $pdo = getConnection();
+                $pdo->prepare("UPDATE usuarios SET last_activity = NOW() WHERE id = ?")
+                    ->execute([$_SESSION['user_id']]);
+                $_SESSION['last_db_activity_update'] = time();
+            } catch (Exception $e) {
+                error_log("Error actualizando last_activity: " . $e->getMessage());
+            }
+        }
+    }
+}
+
+/**
+ * Obtener tiempo restante de sesión en segundos
+ * @return int
+ */
+function getSessionTimeRemaining() {
+    if (!isLoggedIn()) {
+        return 0;
+    }
+    
+    $lastActivity = $_SESSION['last_activity'] ?? 0;
+    $timeout = $_SESSION['session_timeout'] ?? SESSION_TIMEOUT_USER;
+    $elapsed = time() - $lastActivity;
+    
+    return max(0, $timeout - $elapsed);
+}
+
+/**
+ * Extender sesión
+ */
+function extendSession() {
+    if (isLoggedIn()) {
+        $_SESSION['last_activity'] = time();
+        updateLastActivity();
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Generar token CSRF
+ * @return string
+ */
+function generateCSRFToken() {
+    if (!isset($_SESSION['csrf_token']) || !isset($_SESSION['csrf_token_time'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        $_SESSION['csrf_token_time'] = time();
+    }
+    
+    // Regenerar si es muy antiguo
+    if ((time() - $_SESSION['csrf_token_time']) > CSRF_TOKEN_EXPIRY) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        $_SESSION['csrf_token_time'] = time();
+    }
+    
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Validar token CSRF
+ * @param string $token
+ * @return bool
+ */
+function validateCSRFToken($token) {
+    if (!isset($_SESSION['csrf_token'])) {
+        return false;
+    }
+    
+    return hash_equals($_SESSION['csrf_token'], $token);
 }
 ?>
 

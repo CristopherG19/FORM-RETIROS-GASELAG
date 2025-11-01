@@ -65,6 +65,8 @@ $currentUser = getCurrentUser();
     </style>
 </head>
 <body class="bg-light">
+    <?php include 'includes/session_middleware.php'; ?>
+    
     <!-- Barra de navegación simplificada -->
     <nav class="navbar navbar-dark bg-dark shadow-sm">
         <div class="container-fluid px-3 px-md-4">
@@ -294,6 +296,17 @@ $currentUser = getCurrentUser();
                         <i class="bi bi-people text-warning card-icon" style="font-size: 2.5rem;"></i>
                         <h6 class="card-title mt-3 mb-2">Gestión de Usuarios</h6>
                         <p class="card-text text-muted small d-none d-lg-block">Usuarios y permisos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seguridad del Sistema -->
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card module-card h-100 shadow-sm" onclick="location.href='pages/admin_desbloquear_cuentas.php'">
+                    <div class="card-body text-center p-3 p-md-4">
+                        <i class="bi bi-shield-lock text-danger card-icon" style="font-size: 2.5rem;"></i>
+                        <h6 class="card-title mt-3 mb-2">Seguridad del Sistema</h6>
+                        <p class="card-text text-muted small d-none d-lg-block">Cuentas y auditoría</p>
                     </div>
                 </div>
             </div>
