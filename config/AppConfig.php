@@ -203,23 +203,6 @@ function sanitizeData($data) {
 }
 
 /**
- * Genera token CSRF
- */
-function generateCSRFToken() {
-    if (!isset($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['csrf_token'];
-}
-
-/**
- * Verifica token CSRF
- */
-function verifyCSRFToken($token) {
-    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
-}
-
-/**
  * Formatea fecha para mostrar
  */
 function formatDate($date, $format = 'd/m/Y H:i') {

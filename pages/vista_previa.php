@@ -125,6 +125,8 @@ try {
     </style>
 </head>
 <body class="bg-light">
+    <?php include '../includes/session_middleware.php'; ?>
+    
     <!-- Navbar -->
     <nav class="navbar navbar-dark bg-dark shadow-sm">
         <div class="container-fluid px-3 px-md-4">

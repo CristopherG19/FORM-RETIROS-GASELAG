@@ -13,11 +13,22 @@ CREATE TABLE IF NOT EXISTS usuarios (
     rol ENUM('admin', 'user') NOT NULL DEFAULT 'user',
     estado ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo',
     ultimo_login TIMESTAMP NULL,
+    last_activity TIMESTAMP NULL,
+    
+    -- Campos de seguridad
+    intentos_fallidos INT DEFAULT 0,
+    bloqueado_hasta TIMESTAMP NULL,
+    ultimo_intento TIMESTAMP NULL,
+    force_password_change BOOLEAN DEFAULT FALSE,
+    password_changed_at TIMESTAMP NULL,
+    session_timeout INT DEFAULT 7200, -- 2 horas para técnicos, 1800 para admins
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_username (username),
     INDEX idx_rol (rol),
-    INDEX idx_estado (estado)
+    INDEX idx_estado (estado),
+    INDEX idx_bloqueado_hasta (bloqueado_hasta)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabla principal de órdenes de servicio (datos del Excel)
@@ -200,8 +211,52 @@ ADD INDEX idx_fecha_limite_evidencia (fecha_limite_evidencia),
 ADD INDEX idx_evidencia_completa (evidencia_completa),
 ADD INDEX idx_sancion_aplicada (sancion_aplicada);
 
--- Insertar usuarios por defecto
-INSERT IGNORE INTO usuarios (username, password, nombre_completo, email, rol) VALUES
-('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Administrador del Sistema', 'admin@gaselag.com', 'admin'),
-('tecnico1', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Técnico de Retiro 1', 'tecnico1@gaselag.com', 'user'),
-('tecnico2', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Técnico de Retiro 2', 'tecnico2@gaselag.com', 'user');
+-- Tabla de dispositivos autorizados para autenticación
+CREATE TABLE IF NOT EXISTS dispositivos_autorizados (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    device_fingerprint VARCHAR(255) NOT NULL UNIQUE,
+    device_name VARCHAR(100),
+    device_type VARCHAR(50), -- mobile, tablet, desktop
+    user_agent TEXT,
+    ip_address VARCHAR(45),
+    first_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ultimo_uso TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    activo BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    INDEX idx_usuario_id (usuario_id),
+    INDEX idx_device_fingerprint (device_fingerprint),
+    INDEX idx_activo (activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de intentos de login (para rate limiting y auditoría)
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    user_agent TEXT,
+    success BOOLEAN NOT NULL,
+    blocked BOOLEAN DEFAULT FALSE,
+    attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_username (username),
+    INDEX idx_ip_address (ip_address),
+    INDEX idx_attempt_time (attempt_time),
+    INDEX idx_success (success)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla de historial de contraseñas (prevenir reutilización)
+CREATE TABLE IF NOT EXISTS password_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    INDEX idx_usuario_id (usuario_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Insertar usuarios por defecto con session_timeout según rol
+INSERT IGNORE INTO usuarios (username, password, nombre_completo, email, rol, session_timeout, force_password_change) VALUES
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Administrador del Sistema', 'admin@gaselag.com', 'admin', 1800, TRUE),
+('12345678', '$2y$10$5VZf4IzN7o7vCqXJBXxEW.Fy3f1SxB7kQ0kP7LY8zM4xW2nH6yLvS', 'Juan Pérez Técnico', 'tecnico1@gaselag.com', 'user', 7200, TRUE),
+('87654321', '$2y$10$5VZf4IzN7o7vCqXJBXxEW.Fy3f1SxB7kQ0kP7LY8zM4xW2nH6yLvS', 'María González Técnico', 'tecnico2@gaselag.com', 'user', 7200, TRUE);
+-- Nota: Password por defecto es '1234' para todos. Deben cambiarla en el primer login.

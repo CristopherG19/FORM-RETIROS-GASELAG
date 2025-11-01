@@ -6,36 +6,78 @@ if (isLoggedIn()) {
     if (isAdmin()) {
         header('Location: index.php');
     } else {
-        header('Location: pages/consultar_retiros.php');
+        header('Location: index.php');
     }
     exit;
 }
 
+// Generar token CSRF
+$csrfToken = generateCSRFToken();
+
 // Procesar login
 $error = '';
 $success = '';
+$warning = '';
+$blocked = false;
+$remainingTime = 0;
+$attemptsLeft = null;
+
 if (isset($_GET['logout']) && $_GET['logout'] == 1) {
     $success = 'Sesión cerrada exitosamente';
 }
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = trim($_POST['password'] ?? '');
+if (isset($_GET['timeout']) && $_GET['timeout'] == 1) {
+    $warning = 'Su sesión expiró por inactividad. Por favor, ingrese nuevamente';
+}
 
-    if (empty($username) || empty($password)) {
-        $error = 'Por favor ingrese usuario y contraseña';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Validar CSRF token
+    $submittedToken = $_POST['csrf_token'] ?? '';
+    if (!validateCSRFToken($submittedToken)) {
+        $error = 'Token de seguridad inválido. Por favor, intente nuevamente';
     } else {
-        if (login($username, $password)) {
-            // Redirigir según el rol
-            if (isAdmin()) {
-                header('Location: index.php');
-            } else {
-                header('Location: pages/consultar_retiros.php');
-            }
-            exit;
+        $username = trim($_POST['username'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+
+        if (empty($username) || empty($password)) {
+            $error = 'Por favor ingrese usuario y contraseña';
         } else {
-            $error = 'Usuario o contraseña incorrectos';
+            $result = login($username, $password);
+            
+            if ($result['success']) {
+                // Verificar si debe cambiar contraseña
+                if ($result['force_password_change']) {
+                    header('Location: pages/cambiar_password.php?first_login=1');
+                    exit;
+                }
+                
+                // Redirigir según el rol
+                if ($result['user_role'] === 'admin') {
+                    header('Location: index.php');
+                } else {
+                    header('Location: index.php');
+                }
+                exit;
+            } else {
+                // Manejar diferentes tipos de error
+                if (isset($result['blocked']) && $result['blocked']) {
+                    $blocked = true;
+                    $remainingTime = $result['remaining'] ?? 0;
+                    
+                    if ($remainingTime === -1) {
+                        $error = 'Cuenta bloqueada permanentemente. Contacte al administrador';
+                    } else {
+                        $error = $result['error'] . '. Tiempo restante: ' . getBlockTimeRemaining($remainingTime);
+                    }
+                } else {
+                    $error = $result['error'];
+                    $attemptsLeft = $result['attempts_left'] ?? null;
+                }
+            }
         }
     }
+    
+    // Regenerar token después del intento
+    $csrfToken = generateCSRFToken();
 }
 ?>
 
@@ -168,34 +210,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         <?php endif; ?>
 
+                        <?php if ($warning): ?>
+                            <div class="alert alert-warning" role="alert">
+                                <i class="bi bi-clock-history me-2"></i>
+                                <?php echo htmlspecialchars($warning); ?>
+                            </div>
+                        <?php endif; ?>
+
                         <?php if ($error): ?>
                             <div class="alert alert-danger" role="alert">
                                 <i class="bi bi-exclamation-triangle me-2"></i>
                                 <?php echo htmlspecialchars($error); ?>
+                                <?php if ($attemptsLeft !== null && $attemptsLeft > 0): ?>
+                                    <br><small>Intentos restantes: <strong><?php echo $attemptsLeft; ?></strong></small>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
 
-                        <form method="POST" action="">
+                        <?php if ($blocked && $remainingTime > 0): ?>
+                            <div class="alert alert-warning" role="alert">
+                                <i class="bi bi-lock me-2"></i>
+                                Su cuenta está bloqueada temporalmente por seguridad.
+                                <br><small>Podrá intentar nuevamente en: <strong id="countdown"><?php echo getBlockTimeRemaining($remainingTime); ?></strong></small>
+                            </div>
+                        <?php endif; ?>
+
+                        <form method="POST" action="" id="loginForm">
+                            <!-- CSRF Token -->
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                            
                             <div class="mb-3">
                                 <label for="username" class="form-label">
-                                    <i class="bi bi-person me-2"></i>Usuario
+                                    <i class="bi bi-person me-2"></i>Usuario / DNI
                                 </label>
-                                <input type="text" class="form-control" id="username" name="username"
-                                       required autocomplete="username" placeholder="Ingrese su usuario">
+                                <input type="text" 
+                                       class="form-control text-center" 
+                                       id="username" 
+                                       name="username"
+                                       inputmode="numeric"
+                                       pattern="[0-9a-zA-Z]*"
+                                       required 
+                                       autocomplete="username" 
+                                       placeholder="Ingrese DNI o usuario"
+                                       style="font-size: 1.1rem; letter-spacing: 1px;"
+                                       <?php echo $blocked ? 'disabled' : ''; ?>>
+                                <small class="text-muted">Técnicos: usar DNI (ej: 12345678)</small>
                             </div>
 
                             <div class="mb-4">
                                 <label for="password" class="form-label">
-                                    <i class="bi bi-key me-2"></i>Contraseña
+                                    <i class="bi bi-key me-2"></i>Contraseña / PIN
                                 </label>
-                                <input type="password" class="form-control" id="password" name="password"
-                                       required autocomplete="current-password" placeholder="Ingrese su contraseña">
+                                <input type="password" 
+                                       class="form-control text-center" 
+                                       id="password" 
+                                       name="password"
+                                       inputmode="numeric"
+                                       required 
+                                       autocomplete="current-password" 
+                                       placeholder="Ingrese PIN o contraseña"
+                                       style="font-size: 1.1rem; letter-spacing: 2px;"
+                                       <?php echo $blocked ? 'disabled' : ''; ?>>
+                                <small class="text-muted">Técnicos: PIN de 4-6 dígitos</small>
                             </div>
 
-                            <button type="submit" class="btn btn-primary btn-login">
+                            <button type="submit" 
+                                    class="btn btn-primary btn-login" 
+                                    <?php echo $blocked ? 'disabled' : ''; ?>>
                                 <i class="bi bi-box-arrow-in-right me-2"></i>Iniciar Sesión
                             </button>
                         </form>
+                        
+                        <div class="mt-3 text-center">
+                            <small class="text-muted">
+                                <i class="bi bi-shield-check me-1"></i>
+                                Conexión segura protegida
+                            </small>
+                        </div>
                     </div>
 
                     <div class="login-footer">
@@ -204,25 +295,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
-                <!-- Información de usuarios de prueba -->
+                <!-- Información de seguridad -->
                 <div class="card mt-3 info-card">
-                    <div class="card-body">
-                        <h6 class="card-title text-center mb-3">Usuarios de Prueba</h6>
-                        <div class="row g-3">
-                            <div class="col-6 text-center">
-                                <div class="border rounded p-2 h-100">
-                                    <strong style="color: #2c3e50; font-size: 0.9rem;">Administrador</strong>
-                                    <hr class="my-2">
-                                    <small class="text-muted">admin / password</small>
-                                </div>
-                            </div>
-                            <div class="col-6 text-center">
-                                <div class="border rounded p-2 h-100">
-                                    <strong style="color: #2c3e50; font-size: 0.9rem;">Técnico</strong>
-                                    <hr class="my-2">
-                                    <small class="text-muted">tecnico1 / password</small>
-                                </div>
-                            </div>
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Máximo <strong><?php echo MAX_LOGIN_ATTEMPTS_USER; ?> intentos</strong> para técnicos
+                            </small>
+                            <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                Sesión: <strong>2 horas</strong>
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -231,5 +315,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Contador regresivo para bloqueos temporales
+        <?php if ($blocked && $remainingTime > 0): ?>
+        let remainingSeconds = <?php echo $remainingTime; ?>;
+        const countdownElement = document.getElementById('countdown');
+        const loginForm = document.getElementById('loginForm');
+        
+        const countdown = setInterval(function() {
+            remainingSeconds--;
+            
+            if (remainingSeconds <= 0) {
+                clearInterval(countdown);
+                // Recargar página cuando expire el bloqueo
+                window.location.reload();
+            } else {
+                // Actualizar display
+                const minutes = Math.floor(remainingSeconds / 60);
+                const seconds = remainingSeconds % 60;
+                countdownElement.textContent = minutes + ' minuto' + (minutes !== 1 ? 's' : '') + 
+                                              ' y ' + seconds + ' segundo' + (seconds !== 1 ? 's' : '');
+            }
+        }, 1000);
+        <?php endif; ?>
+        
+        // Optimización para móviles: focus automático en username
+        document.addEventListener('DOMContentLoaded', function() {
+            const usernameInput = document.getElementById('username');
+            if (usernameInput && !usernameInput.disabled) {
+                usernameInput.focus();
+            }
+        });
+        
+        // Cambiar inputmode a numeric cuando detectamos que es solo números
+        document.getElementById('username').addEventListener('input', function(e) {
+            const value = e.target.value;
+            if (/^\d+$/.test(value)) {
+                // Solo números, es DNI
+                e.target.setAttribute('inputmode', 'numeric');
+            } else {
+                // Contiene letras, es username
+                e.target.setAttribute('inputmode', 'text');
+            }
+        });
+    </script>
 </body>
 </html>

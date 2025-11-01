@@ -211,6 +211,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
     </style>
 </head>
 <body>
+    <?php include '../includes/session_middleware.php'; ?>
+    
     <!-- Overlay para sidebar en móvil -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     
