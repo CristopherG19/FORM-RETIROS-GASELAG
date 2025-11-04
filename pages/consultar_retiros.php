@@ -6,6 +6,7 @@ requireRole(['admin', 'user']);
 
 // Filtros
 $filtro_oc = isset($_GET['filtro_oc']) ? trim($_GET['filtro_oc']) : '';
+$filtro_num_suministro = isset($_GET['filtro_num_suministro']) ? trim($_GET['filtro_num_suministro']) : '';
 $filtro_fecha_desde = isset($_GET['filtro_fecha_desde']) ? $_GET['filtro_fecha_desde'] : '';
 $filtro_fecha_hasta = isset($_GET['filtro_fecha_hasta']) ? $_GET['filtro_fecha_hasta'] : '';
 $filtro_retirado = isset($_GET['filtro_retirado']) ? $_GET['filtro_retirado'] : '';
@@ -24,6 +25,8 @@ try {
                 o.usuario_reclamante,
                 o.direccion,
                 o.num_serie_medidor,
+                o.num_suministro,
+                o.centro_servicio,
                 o.marca_medidor,
                 o.modelo_medidor,
                 o.programacion_dia_retiro,
@@ -75,8 +78,18 @@ try {
     }
     
     if (!empty($filtro_oc)) {
+        // Si el usuario no incluye "OC-", agregarlo automáticamente
+        $oc_busqueda = $filtro_oc;
+        if (stripos($oc_busqueda, 'OC-') !== 0) {
+            $oc_busqueda = 'OC-' . $oc_busqueda;
+        }
         $sql .= " AND r.orden_servicio LIKE ?";
-        $params[] = "%$filtro_oc%";
+        $params[] = "%$oc_busqueda%";
+    }
+    
+    if (!empty($filtro_num_suministro)) {
+        $sql .= " AND o.num_suministro LIKE ?";
+        $params[] = "%$filtro_num_suministro%";
     }
     
     if (!empty($filtro_fecha_desde)) {
@@ -258,7 +271,12 @@ require_once '../includes/header.php';
                         <div class="col-md-3 mb-3">
                             <label for="filtro_oc" class="form-label">Orden de Servicio</label>
                             <input type="text" class="form-control" id="filtro_oc" name="filtro_oc" 
-                                   value="<?= htmlspecialchars($filtro_oc) ?>" placeholder="Ej: OC-00001">
+                                   value="<?= htmlspecialchars($filtro_oc) ?>" placeholder="Ej: 00001">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="filtro_num_suministro" class="form-label">N° Suministro</label>
+                            <input type="text" class="form-control" id="filtro_num_suministro" name="filtro_num_suministro" 
+                                   value="<?= htmlspecialchars($filtro_num_suministro) ?>" placeholder="Ej: 123456">
                         </div>
                         <div class="col-md-3 mb-3">
                             <label for="filtro_fecha_desde" class="form-label">Fecha Retiro Desde</label>
@@ -340,8 +358,8 @@ require_once '../includes/header.php';
                                 <tr>
                                     <th>Fecha Retiro</th>
                                     <th>Orden Servicio</th>
-                                    <th>Cliente</th>
-                                    <th>N° Serie</th>
+                                    <th>N° Suministro</th>
+                                    <th>Centro Servicio</th>
                                     <th>Medidor Retirado</th>
                                     <th>Registrado por</th>
                                     <th class="text-center">
@@ -363,8 +381,8 @@ require_once '../includes/header.php';
                                         ?>">
                                         <td><?= !empty($retiro['programacion_dia_retiro']) ? date('d/m/Y', strtotime($retiro['programacion_dia_retiro'])) : 'N/A' ?></td>
                                         <td><strong><?= htmlspecialchars($retiro['orden_servicio']) ?></strong></td>
-                                        <td><?= htmlspecialchars($retiro['cliente']) ?></td>
-                                        <td><?= htmlspecialchars($retiro['num_serie_medidor']) ?></td>
+                                        <td><?= htmlspecialchars($retiro['num_suministro'] ?? 'N/A') ?></td>
+                                        <td><?= htmlspecialchars($retiro['centro_servicio'] ?? 'N/A') ?></td>
                                         <td>
                                             <?php if ($retiro['medidor_retirado'] === 'SI'): ?>
                                                 <span class="badge bg-success">SÍ</span>
@@ -447,7 +465,6 @@ require_once '../includes/header.php';
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Debug para verificar que los datos se están cargando correctamente
         console.log('=== DASHBOARD DEBUG ===');
