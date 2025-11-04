@@ -163,12 +163,29 @@ try {
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
 }
-
-$pageTitle = 'Consultar Retiros - Sistema GASELAG';
-require_once '../includes/header.php';
 ?>
-
-<div class="container-fluid px-4 py-4">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultar Retiros - GASELAG</title>
+    <!-- Forzar recarga para evitar cache - Sistema de aislamiento de datos -->
+    <meta name="version" content="3.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Cache buster para evitar problemas de cache -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+</head>
+<body class="bg-light">
+    <div class="container-fluid px-4 py-4">
+        <div class="mb-3">
+            <a href="../index.php" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Volver al Inicio
+            </a>
+        </div>
 
         <!-- Estadísticas -->
         <div class="row mb-4">
@@ -476,5 +493,6 @@ require_once '../includes/header.php';
             window.location.href = 'exportar_excel.php?' + params.toString();
         }
     </script>
+</body>
+</html>
 
-<?php require_once '../includes/footer.php'; ?>

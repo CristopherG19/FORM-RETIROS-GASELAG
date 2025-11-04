@@ -44,19 +44,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = login($username, $password);
             
             if ($result['success']) {
+                // Marcar como login exitoso para mostrar pantalla de bienvenida
+                $loginSuccess = true;
+                $userName = $result['user_name'];
+                $userRole = $result['user_role'];
+                
                 // Verificar si debe cambiar contraseña
                 if ($result['force_password_change']) {
-                    header('Location: pages/cambiar_password.php?first_login=1');
-                    exit;
+                    $redirectUrl = 'pages/cambiar_password.php?first_login=1';
+                } else {
+                    $redirectUrl = 'index.php?login=success';
                 }
                 
-                // Redirigir según el rol
-                if ($result['user_role'] === 'admin') {
-                    header('Location: index.php');
-                } else {
-                    header('Location: index.php');
-                }
-                exit;
+                // Redirigir después de 1.5 segundos
             } else {
                 // Manejar diferentes tipos de error
                 if (isset($result['blocked']) && $result['blocked']) {
@@ -203,6 +203,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
 
                     <div class="login-body">
+                        <?php if (isset($loginSuccess) && $loginSuccess): ?>
+                            <!-- Pantalla de Login Exitoso -->
+                            <div class="text-center py-4">
+                                <div class="mb-4">
+                                    <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                                </div>
+                                <h4 class="text-success mb-3">¡Bienvenido!</h4>
+                                <p class="text-muted mb-2">
+                                    <strong><?php echo htmlspecialchars($userName); ?></strong>
+                                </p>
+                                <p class="text-muted mb-4">
+                                    <small>
+                                        <?php echo $userRole === 'admin' ? '🔐 Administrador' : '🔧 Técnico'; ?>
+                                    </small>
+                                </p>
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <p class="text-muted mt-3">
+                                    <small>Iniciando sesión...</small>
+                                </p>
+                            </div>
+                            <script>
+                                // Redirigir después de 1.5 segundos
+                                setTimeout(function() {
+                                    window.location.href = '<?php echo $redirectUrl; ?>';
+                                }, 1500);
+                            </script>
+                        <?php else: ?>
                         <?php if ($success): ?>
                             <div class="alert alert-success" role="alert">
                                 <i class="bi bi-check-circle me-2"></i>
@@ -287,6 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 Conexión segura protegida
                             </small>
                         </div>
+                        <?php endif; ?> <!-- Cierre del else de loginSuccess -->
                     </div>
 
                     <div class="login-footer">

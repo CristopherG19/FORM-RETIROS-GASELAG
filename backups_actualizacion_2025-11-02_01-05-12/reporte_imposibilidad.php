@@ -82,12 +82,23 @@ try {
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
 }
-
-$pageTitle = 'Reporte de Casos Críticos - Sistema GASELAG';
-require_once '../includes/header.php';
 ?>
-
-<div class="container-fluid px-4 py-4">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Registros Sin Foto - GASELAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+    <div class="container-fluid px-4 py-4">
+        <div class="mb-3">
+            <a href="consultar_retiros.php" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Volver a Retiros
+            </a>
+        </div>
 
         <!-- Encabezado -->
         <div class="card border-0 shadow-sm mb-4">
@@ -363,5 +374,5 @@ require_once '../includes/header.php';
             window.location.href = 'exportar_excel.php?filtro_problematicos=SI';
         }
     </script>
-
-<?php require_once '../includes/footer.php'; ?>
+</body>
+</html>

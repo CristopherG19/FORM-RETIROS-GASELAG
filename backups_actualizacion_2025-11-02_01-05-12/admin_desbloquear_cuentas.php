@@ -1,30 +1,87 @@
 <?php
 require_once '../config/database.php';
 
+// Solo administradores
 requireRole(['admin']);
 
+$message = '';
+$messageType = '';
+
+// Procesar desbloqueo
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $action = $_POST['action'];
+    $username = $_POST['username'] ?? '';
+    
+    if ($action === 'unlock' && !empty($username)) {
+        if (unlockAccount($username, $_SESSION['user_id'])) {
+            $message = "Cuenta '$username' desbloqueada exitosamente";
+            $messageType = 'success';
+        } else {
+            $message = "Error al desbloquear la cuenta '$username'";
+            $messageType = 'danger';
+        }
+    } elseif ($action === 'cleanup') {
+        $deleted = cleanupOldLoginAttempts();
+        $message = "Limpieza completada: $deleted registros antiguos eliminados";
+        $messageType = 'info';
+    }
+}
+
+// Obtener cuentas bloqueadas
+$blockedAccounts = getBlockedAccounts();
+
+// Obtener estadísticas
+$stats = getLoginStats(24);
+
 $currentUser = getCurrentUser();
-
-$pageTitle = 'Desbloquear Cuentas - Sistema GASELAG';
-require_once '../includes/header.php';
 ?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Cuentas Bloqueadas - GASELAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .stats-card {
+            transition: box-shadow 0.2s;
+        }
+        .stats-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .account-card {
+            transition: box-shadow 0.2s;
+        }
+        .account-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <?php include '../includes/session_middleware.php'; ?>
+    
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-3 px-md-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="../index.php">
+                <i class="bi bi-speedometer2 me-2 fs-4"></i>
+                <span class="d-none d-sm-inline">GASELAG</span>
+            </a>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-white small d-none d-md-inline">
+                    <i class="bi bi-person-circle me-1"></i>
+                    <?php echo htmlspecialchars($currentUser['nombre_completo']); ?>
+                </span>
+                <a href="../index.php" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-arrow-left"></i>
+                    <span class="d-none d-sm-inline"> Volver</span>
+                </a>
+            </div>
+        </div>
+    </nav>
 
-<style>
-.stats-card {
-    transition: box-shadow 0.2s;
-}
-.stats-card:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-.account-card {
-    transition: box-shadow 0.2s;
-}
-.account-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-</style>
-
-<div class="container py-4">
+    <div class="container py-4">
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>
@@ -274,6 +331,6 @@ require_once '../includes/header.php';
         <?php endif; ?>
     </div>
 
-    
-
-<?php require_once '../includes/footer.php'; ?>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -140,12 +140,16 @@ function getPaginationUrl($pagina) {
     $params[] = "pagina=" . $pagina;
     return "listar_oc.php?" . implode("&", $params);
 }
-
-$pageTitle = 'Listar OCs - Sistema GASELAG';
-require_once '../includes/header.php';
 ?>
-
-<style>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listar Órdenes de Servicio - GASELAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
         .status-badge {
             font-weight: 600;
             padding: 0.5rem 1rem;
@@ -164,9 +168,15 @@ require_once '../includes/header.php';
         .table-hover tbody tr:hover {
             cursor: pointer;
         }
-</style>
-
-<div class="container-fluid px-4 py-4">
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid px-4 py-4">
+        <div class="mb-3">
+            <a href="../index.php" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Volver al Inicio
+            </a>
+        </div>
 
         <!-- Título y descripción -->
         <div class="card border-0 shadow-sm mb-4">
@@ -509,5 +519,6 @@ require_once '../includes/header.php';
             window.location.href = 'exportar_excel.php?tipo=todas&' + params.toString();
         }
     </script>
+</body>
+</html>
 
-<?php require_once '../includes/footer.php'; ?>

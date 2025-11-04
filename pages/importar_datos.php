@@ -4,6 +4,9 @@ require_once '../config/database.php';
 // Verificar autenticación y rol de administrador
 requireRole(['admin']);
 
+$pageTitle = 'Importar Datos - Sistema GASELAG';
+require_once '../includes/header.php';
+
 $message = '';
 $messageType = '';
 
@@ -114,190 +117,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
 }
 ?>
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Importar Datos - GASELAG</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        /* Sidebar responsive */
-        @media (max-width: 767.98px) {
-            .sidebar {
-                position: fixed;
-                top: 0;
-                left: -100%;
-                height: 100vh;
-                width: 280px;
-                z-index: 1050;
-                transition: left 0.3s ease;
-            }
-            .sidebar.show {
-                left: 0;
-            }
-            .sidebar-overlay {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.5);
-                z-index: 1040;
-            }
-            .sidebar-overlay.show {
-                display: block;
-            }
-        }
-        
-        /* Upload area mejorada */
-        .upload-area {
-            border: 3px dashed #dee2e6;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            min-height: 200px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        .upload-area:hover {
-            border-color: #0d6efd;
-            background-color: #f8f9fa;
-        }
-        .upload-area.dragover {
-            border-color: #198754;
-            background-color: #d1e7dd;
-        }
-        .upload-area.has-file {
-            border-color: #198754;
-            background-color: #d1e7dd;
-        }
-        
-        /* Progress bar container */
-        .progress-container {
-            display: none;
-        }
-        
-        /* Stats cards responsive SIN MOVIMIENTO */
-        .stat-card {
-            transition: box-shadow 0.2s ease;
-        }
-        .stat-card:hover {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        
-        /* Método badge responsive */
-        @media (max-width: 575.98px) {
-            .method-badge {
-                display: block;
-                margin-top: 10px;
-            }
-        }
-        
-        /* File preview */
-        .file-preview {
-            display: none;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-        .file-preview.show {
-            display: block;
-        }
-    </style>
-</head>
-<body>
-    <?php include '../includes/session_middleware.php'; ?>
-    
-    <!-- Overlay para sidebar en móvil -->
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
-    
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 bg-light shadow-sm sidebar" id="sidebar" style="min-height: 100vh;">
-                <div class="position-sticky pt-3">
-                    <!-- Close button para móvil -->
-                    <button class="btn btn-close float-end d-md-none mb-3" id="closeSidebar"></button>
-                    
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" href="../index.php">
-                                <i class="bi bi-house me-2"></i> Inicio
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" href="buscar_oc.php">
-                                <i class="bi bi-search me-2"></i> Buscar OC
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" href="consultar_retiros.php">
-                                <i class="bi bi-list-ul me-2"></i> Consultar Retiros
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active bg-dark text-white rounded" href="importar_datos.php">
-                                <i class="bi bi-upload me-2"></i> Importar Datos
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" href="exportar_excel.php">
-                                <i class="bi bi-download me-2"></i> Exportar Excel
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" href="../logout.php">
-                                <i class="bi bi-box-arrow-right me-2"></i> Cerrar Sesión
-                            </a>
-                        </li>
-                    </ul>
-                </div>
+<style>
+/* Upload area mejorada */
+.upload-area {
+    border: 3px dashed #dee2e6;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.upload-area:hover {
+    border-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+.upload-area.dragover {
+    border-color: #198754;
+    background-color: #d1e7dd;
+}
+.upload-area.has-file {
+    border-color: #198754;
+    background-color: #d1e7dd;
+}
+
+/* Progress bar container */
+.progress-container {
+    display: none;
+}
+
+/* Stats cards responsive */
+.stat-card {
+    transition: box-shadow 0.2s ease;
+}
+.stat-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* File preview */
+.file-preview {
+    display: none;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+.file-preview.show {
+    display: block;
+}
+</style>
+
+<div class="container py-4">
+    <!-- Header -->
+    <div class="bg-white rounded shadow-sm p-3 p-md-4 mb-3 mb-md-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-1">
+                    <i class="bi bi-cloud-upload text-primary"></i> 
+                    Importar Órdenes de Servicio
+                </h2>
+                <p class="text-muted mb-0">Carga masiva de datos desde Excel o CSV</p>
             </div>
+        </div>
+    </div>
 
-            <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-3 px-md-4 py-3 py-md-4">
-                <!-- Header con menú hamburguesa para móvil -->
-                <div class="bg-white rounded shadow-sm p-3 p-md-4 mb-3 mb-md-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center flex-grow-1">
-                            <!-- Botón menú para móvil -->
-                            <button class="btn btn-light d-md-none me-2" id="toggleSidebar">
-                                <i class="bi bi-list fs-4"></i>
-                            </button>
-                            
-                            <div>
-                                <h1 class="h3 h-md-2 mb-1 mb-md-2">
-                                    <i class="bi bi-cloud-upload text-primary"></i> 
-                                    <span class="d-none d-sm-inline">Importar Órdenes de Servicio</span>
-                                    <span class="d-sm-none">Importar</span>
-                                </h1>
-                                <p class="text-muted mb-0 small d-none d-sm-block">Carga masiva de datos desde Excel o CSV</p>
-                            </div>
-                        </div>
-                        <div>
-                            <a href="../index.php" class="btn btn-outline-secondary btn-sm">
-                                <i class="bi bi-arrow-left"></i>
-                                <span class="d-none d-sm-inline"> Volver</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
+    <?php if ($message): ?>
+        <div class="alert alert-<?php echo $messageType === 'error' ? 'danger' : ($messageType === 'warning' ? 'warning' : 'success'); ?> alert-dismissible fade show">
+            <i class="bi bi-<?php echo $messageType === 'error' ? 'exclamation-triangle' : ($messageType === 'warning' ? 'exclamation-circle' : 'check-circle'); ?>"></i>
+            <?php echo htmlspecialchars($message); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
 
-                        <?php if ($message): ?>
-                    <div class="alert alert-<?php echo $messageType === 'error' ? 'danger' : ($messageType === 'warning' ? 'warning' : 'success'); ?> alert-dismissible fade show">
-                        <i class="bi bi-<?php echo $messageType === 'error' ? 'exclamation-triangle' : ($messageType === 'warning' ? 'exclamation-circle' : 'check-circle'); ?>"></i>
-                        <?php echo htmlspecialchars($message); ?>
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        <?php endif; ?>
-
-                <!-- Estadísticas responsive -->
-                <div class="row g-2 g-md-3 mb-3 mb-md-4">
+    <!-- Estadísticas responsive -->
+    <div class="row g-2 g-md-3 mb-3 mb-md-4">
                     <div class="col-12 col-sm-6 col-lg-4">
                         <div class="card border-0 shadow-sm bg-primary text-white stat-card">
                             <div class="card-body p-3">
@@ -443,27 +337,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
                                             </div>
                                             
                                             <!-- File preview -->
-                                            <div class="file-preview" id="filePreview">
-                                                <div class="d-flex align-items-center justify-content-between">
-                                                    <div class="d-flex align-items-center">
-                                                        <i class="bi bi-file-earmark-check text-success fs-3 me-3"></i>
-                                                        <div>
-                                                            <strong id="fileName">archivo.csv</strong>
-                                                            <br>
-                                                            <small class="text-muted" id="fileSize">0 KB</small>
+                                            <div class="file-preview" id="filePreview" style="display: none;">
+                                                <div class="card border-success mt-3">
+                                                    <div class="card-body">
+                                                        <div class="d-flex align-items-center justify-content-between mb-3">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="bi bi-file-earmark-check text-success fs-2 me-3"></i>
+                                                                <div>
+                                                                    <strong id="fileName">archivo.csv</strong>
+                                                                    <br>
+                                                                    <small class="text-muted" id="fileSize">0 KB</small>
+                                                                </div>
+                                                            </div>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="removeFile">
+                                                                <i class="bi bi-x-lg"></i> Quitar
+                                                            </button>
+                                                        </div>
+                                                        
+                                                        <!-- Botón para procesar el archivo -->
+                                                        <div class="d-grid gap-2">
+                                                            <button type="button" class="btn btn-success btn-lg" id="processFileBtn">
+                                                                <i class="bi bi-upload"></i> Importar Archivo al Sistema
+                                                            </button>
                                                         </div>
                                                     </div>
-                                                    <button type="button" class="btn btn-sm btn-outline-danger" id="removeFile">
-                                                        <i class="bi bi-x-lg"></i>
-                                                    </button>
                                                 </div>
                                             </div>
                                             
-                                            <div class="progress-container mt-3">
-                                                <div class="progress mb-2" style="height: 25px;">
+                                            <div class="progress-container mt-3" id="progressContainer" style="display: none;">
+                                                <div class="progress mb-2" style="height: 30px;">
                                                     <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
-                                                         role="progressbar" style="width: 0%">
-                                                        <span class="progress-text">0%</span>
+                                                         role="progressbar" style="width: 0%" id="progressBar">
+                                                        <span class="fw-bold" id="progressText">0%</span>
                                                     </div>
                                                 </div>
                                                 <div class="text-center">
@@ -560,94 +465,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
                         </div>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // ========== SIDEBAR RESPONSIVE ==========
-        const sidebar = document.getElementById('sidebar');
-        const sidebarOverlay = document.getElementById('sidebarOverlay');
-        const toggleSidebar = document.getElementById('toggleSidebar');
-        const closeSidebar = document.getElementById('closeSidebar');
+<script>
+    // Variables globales
+    const fileInput = document.getElementById('excelFile'); // Corregido: debe coincidir con el ID del input en el HTML
+    const uploadArea = document.getElementById('uploadArea');
+    const filePreview = document.getElementById('filePreview');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const removeFile = document.getElementById('removeFile');
+    const processFileBtn = document.getElementById('processFileBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
 
-        // Abrir sidebar
-        toggleSidebar?.addEventListener('click', () => {
-            sidebar.classList.add('show');
-            sidebarOverlay.classList.add('show');
-        });
-
-        // Cerrar sidebar
-        closeSidebar?.addEventListener('click', () => {
-            sidebar.classList.remove('show');
-            sidebarOverlay.classList.remove('show');
-        });
-
-        // Cerrar al hacer clic en overlay
-        sidebarOverlay?.addEventListener('click', () => {
-            sidebar.classList.remove('show');
-            sidebarOverlay.classList.remove('show');
-        });
-
-        // ========== UPLOAD FILE FUNCTIONALITY ==========
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('excelFile');
-        const form = document.getElementById('excelUploadForm');
-        const progressContainer = document.querySelector('.progress-container');
-        const progressBar = document.querySelector('.progress-bar');
-        const progressText = document.querySelector('.progress-bar .progress-text');
-        const filePreview = document.getElementById('filePreview');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
-        const removeFile = document.getElementById('removeFile');
-
-        // Click en área de subida
-        uploadArea?.addEventListener('click', () => fileInput.click());
+    // Click en área de subida
+    if (uploadArea) {
+        uploadArea.addEventListener('click', () => fileInput.click());
+    }
 
         // Drag and drop
-        uploadArea?.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
+        if (uploadArea) {
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
 
-        uploadArea?.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
 
-        uploadArea?.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                showFilePreview(files[0]);
-            }
-        });
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    showFilePreview(files[0]);
+                }
+            });
+        }
 
         // Cambio de archivo
-        fileInput?.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                showFilePreview(e.target.files[0]);
-            }
-        });
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    showFilePreview(e.target.files[0]);
+                }
+            });
+        }
 
         // Remover archivo
-        removeFile?.addEventListener('click', () => {
-            fileInput.value = '';
-            filePreview.classList.remove('show');
-            uploadArea.classList.remove('has-file');
-        });
+        if (removeFile) {
+            removeFile.addEventListener('click', () => {
+                fileInput.value = '';
+                filePreview.style.display = 'none';
+                uploadArea.classList.remove('has-file');
+            });
+        }
 
-        // Mostrar preview del archivo
+        // Botón para procesar el archivo
+        if (processFileBtn) {
+            processFileBtn.addEventListener('click', () => {
+                handleFileUpload();
+            });
+        }
+
+        // Mostrar preview del archivo (SIN auto-upload)
         function showFilePreview(file) {
             fileName.textContent = file.name;
             fileSize.textContent = formatFileSize(file.size);
-            filePreview.classList.add('show');
+            filePreview.style.display = 'block';
             uploadArea.classList.add('has-file');
             
-            // Auto-upload después de seleccionar
-            setTimeout(() => handleFileUpload(), 500);
+            // Ya NO hay auto-upload - el usuario debe hacer clic en el botón "Importar Archivo al Sistema"
         }
 
         // Formatear tamaño de archivo
@@ -753,5 +645,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
             });
         }
     </script>
-</body>
-</html>
+
+<?php require_once '../includes/footer.php'; ?>

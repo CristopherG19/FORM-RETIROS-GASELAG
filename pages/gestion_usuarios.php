@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username'])) {
                 $error = "El nombre de usuario ya existe";
             } else {
                 // Crear nuevo usuario
-                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+                $hashedPassword = password_hash($password, PASSWORD_BCRYPT, ['cost' => 8]);
                 $insertSql = "INSERT INTO usuarios (username, password, nombre_completo, email, rol, estado)
                              VALUES (:username, :password, :nombre_completo, :email, :rol, 'activo')";
                 $insertStmt = $pdo->prepare($insertSql);
@@ -121,17 +121,12 @@ try {
     $error = "Error al obtener usuarios: " . $e->getMessage();
     $usuarios = [];
 }
+
+$pageTitle = 'Gestión de Usuarios - Sistema GASELAG';
+require_once '../includes/header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Usuarios - GASELAG</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
+<style>
         .user-card {
             transition: box-shadow 0.2s;
         }
@@ -144,58 +139,9 @@ try {
         .role-badge {
             font-size: 0.75rem;
         }
-    </style>
-</head>
-<body class="bg-light">
-    <!-- Barra de navegación -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
-        <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="../index.php">
-                <i class="bi bi-speedometer2 me-2"></i>
-                GASELAG
-            </a>
+</style>
 
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <span class="navbar-text">
-                            <i class="bi bi-person-circle me-1"></i>
-                            <?php echo htmlspecialchars($currentUser['nombre_completo']); ?>
-                        </span>
-                    </li>
-                    <li class="nav-item">
-                        <span class="navbar-text">
-                            <i class="bi bi-shield-check ms-3 me-1"></i>
-                            <span class="badge bg-warning text-dark">Administrador</span>
-                        </span>
-                    </li>
-                </ul>
-
-                <ul class="navbar-nav">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-gear me-1"></i>Opciones
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="../index.php">
-                                <i class="bi bi-house me-2"></i>Panel Principal
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="../logout.php">
-                                <i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión
-                            </a></li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container py-4">
+<div class="container py-4">
         <!-- Header -->
         <div class="row mb-4">
             <div class="col-12">
@@ -389,5 +335,5 @@ try {
 
         // Ya no necesitamos recargar automáticamente, las redirecciones limpian la URL
     </script>
-</body>
-</html>
+
+<?php require_once '../includes/footer.php'; ?>

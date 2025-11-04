@@ -130,12 +130,25 @@ if (isset($_GET['limpiar'])) {
     header('Location: buscar_oc.php');
     exit;
 }
-
-$pageTitle = 'Buscar OC - Sistema GASELAG';
-require_once '../includes/header.php';
 ?>
-
-<style>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscar Órdenes de Servicio - GASELAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        /* Hero gradient header */
+        .hero-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
         /* Card hover effects SIN MOVIMIENTO */
         .search-card, .selected-card {
             transition: box-shadow 0.3s ease;
@@ -177,9 +190,64 @@ require_once '../includes/header.php';
         .btn-search:hover {
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
-</style>
+        
+        /* Responsive adjustments */
+        @media (max-width: 767.98px) {
+            .hero-header {
+                padding: 1.5rem 0;
+            }
+            .hero-header h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <?php include '../includes/session_middleware.php'; ?>
+    
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-3 px-md-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="../index.php">
+                <i class="bi bi-speedometer2 me-2 fs-4"></i>
+                <span class="d-none d-sm-inline">GASELAG</span>
+            </a>
+            <a href="../index.php" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-arrow-left"></i>
+                <span class="d-none d-sm-inline"> Volver</span>
+            </a>
+        </div>
+    </nav>
 
-<div class="container py-4">
+    <!-- Hero Header -->
+    <div class="hero-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-8 mx-auto text-center">
+                    <h1 class="fw-bold mb-2">
+                        <i class="bi bi-search me-2"></i>
+                        Buscar Órdenes de Servicio
+                    </h1>
+                    <p class="mb-3 opacity-90">Encuentra y selecciona las OCs para registrar retiros</p>
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        <?php if (!empty($_SESSION['selected_ocs'])): ?>
+                            <span class="badge bg-success px-3 py-2 badge-pulse">
+                                <i class="bi bi-check-circle me-1"></i>
+                                <?= count($_SESSION['selected_ocs']) ?> OC<?= count($_SESSION['selected_ocs']) > 1 ? 's' : '' ?> seleccionada<?= count($_SESSION['selected_ocs']) > 1 ? 's' : '' ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="badge bg-light text-dark px-3 py-2">
+                                <i class="bi bi-inbox me-1"></i>
+                                Ninguna OC seleccionada
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container pb-4">
 
         <!-- Mensajes globales -->
         <?php if ($message): ?>
@@ -461,6 +529,9 @@ require_once '../includes/header.php';
                 </div>
             </div>
         </div>
-</div>
+    </div>
 
-<?php require_once '../includes/footer.php'; ?>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

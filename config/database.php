@@ -262,16 +262,22 @@ function logout() {
 // Función para verificar acceso a una página según el rol
 function requireRole($requiredRoles) {
     if (!isLoggedIn()) {
-        header('Location: login.php');
+        // Determinar la ruta correcta al login según la ubicación actual
+        $loginPath = (strpos($_SERVER['PHP_SELF'], '/pages/') !== false) ? '../login.php' : 'login.php';
+        header('Location: ' . $loginPath);
         exit;
     }
 
     if (!in_array(getUserRole(), $requiredRoles)) {
-        // Redirigir según el rol del usuario
+        // Redirigir según el rol del usuario y ubicación actual
+        $isInPages = (strpos($_SERVER['PHP_SELF'], '/pages/') !== false);
+        
         if (isAdmin()) {
-            header('Location: index.php');
+            $indexPath = $isInPages ? '../index.php' : 'index.php';
+            header('Location: ' . $indexPath);
         } else {
-            header('Location: pages/consultar_retiros.php');
+            $consultaPath = $isInPages ? 'consultar_retiros.php' : 'pages/consultar_retiros.php';
+            header('Location: ' . $consultaPath);
         }
         exit;
     }

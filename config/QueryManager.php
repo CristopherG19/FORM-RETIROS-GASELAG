@@ -283,7 +283,7 @@ class UsuarioManager {
         
         $params = [
             $datos['username'],
-            password_hash($datos['password'], PASSWORD_DEFAULT),
+            password_hash($datos['password'], PASSWORD_BCRYPT, ['cost' => 8]),
             $datos['nombre_completo'],
             $datos['email'] ?? null,
             $datos['rol'] ?? 'user',
@@ -310,7 +310,7 @@ class UsuarioManager {
         // Si se proporciona nueva contraseña
         if (!empty($datos['password'])) {
             $sql .= ", password = ?";
-            $params[] = password_hash($datos['password'], PASSWORD_DEFAULT);
+            $params[] = password_hash($datos['password'], PASSWORD_BCRYPT, ['cost' => 8]);
         }
         
         $sql .= " WHERE id = ?";

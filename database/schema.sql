@@ -255,8 +255,9 @@ CREATE TABLE IF NOT EXISTS password_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insertar usuarios por defecto con session_timeout según rol
+-- Hashes optimizados con costo 8 para mejor performance en desarrollo
 INSERT IGNORE INTO usuarios (username, password, nombre_completo, email, rol, session_timeout, force_password_change) VALUES
-('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Administrador del Sistema', 'admin@gaselag.com', 'admin', 1800, TRUE),
-('12345678', '$2y$10$5VZf4IzN7o7vCqXJBXxEW.Fy3f1SxB7kQ0kP7LY8zM4xW2nH6yLvS', 'Juan Pérez Técnico', 'tecnico1@gaselag.com', 'user', 7200, TRUE),
-('87654321', '$2y$10$5VZf4IzN7o7vCqXJBXxEW.Fy3f1SxB7kQ0kP7LY8zM4xW2nH6yLvS', 'María González Técnico', 'tecnico2@gaselag.com', 'user', 7200, TRUE);
--- Nota: Password por defecto es '1234' para todos. Deben cambiarla en el primer login.
+('admin', '$2y$08$BDvI2cPOUaeP41OFo7IaLOC5cg14vzLPyst4Bk1Qb9J2bpWxNDpTG', 'Administrador del Sistema', 'admin@gaselag.com', 'admin', 1800, TRUE),
+('12345678', '$2y$08$qtL6UBB1ZUKA6Pa9hyQ.d.R9puOt1s.JPjmMYqbBkGjK//ES2j2jG', 'Juan Pérez Técnico', 'tecnico1@gaselag.com', 'user', 7200, TRUE),
+('87654321', '$2y$08$5gv/1AGpd7ZA1mxmgV2XJeRMXTsAjqehO2uqyHqTI8UVLANdQ8UOG', 'María González Técnico', 'tecnico2@gaselag.com', 'user', 7200, TRUE);
+-- Nota: Password por defecto es 'password' para todos. Deben cambiarla en el primer login.

@@ -78,12 +78,17 @@ try {
 } catch (PDOException $e) {
     $estadisticas = [];
 }
-
-$pageTitle = 'Gestión de Imposibilidad - Sistema GASELAG';
-require_once '../includes/header.php';
 ?>
 
-<style>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Tipos de Imposibilidad - GASELAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
         .tipo-card {
             transition: box-shadow 0.2s;
         }
@@ -96,9 +101,16 @@ require_once '../includes/header.php';
         .stats-badge {
             font-size: 0.75rem;
         }
-</style>
-
-<div class="container-fluid py-4">
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Barra de navegación -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="../index.php">
+                <i class="bi bi-speedometer2 me-2"></i>
+                GASELAG
+            </a>
 
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -405,5 +417,5 @@ require_once '../includes/header.php';
             }, 2000);
         <?php endif; ?>
     </script>
-
-<?php require_once '../includes/footer.php'; ?>
+</body>
+</html>

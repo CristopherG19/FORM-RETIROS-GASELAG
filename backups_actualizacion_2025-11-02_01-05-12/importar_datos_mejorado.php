@@ -1,13 +1,90 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación y rol de administrador
 requireRole(['admin']);
 
-$pageTitle = 'Importar Datos - Sistema GASELAG';
-require_once '../includes/header.php';
+$message = '';
+$messageType = '';
+
+// Obtener estadísticas actuales
+$pdo = getConnection();
+$totalRegistros = $pdo->query("SELECT COUNT(*) as total FROM ordenes_servicio")->fetch()['total'];
+
+// Procesar importación (método anterior para compatibilidad)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
+    try {
+        $lines = explode("\n", trim($_POST['csv_data']));
+        $success = 0;
+        $errors = 0;
+        
+        $pdo->beginTransaction();
+        
+        foreach ($lines as $lineNumber => $line) {
+            if (empty(trim($line))) continue;
+            
+            $data = explode("\t", $line);
+            
+            if (count($data) < 33) {
+                $errors++;
+                continue;
+            }
+            
+            $sql = "INSERT INTO ordenes_servicio (
+                item, orden_servicio, fecha_os, cantidad_medidores, tipo_servicio,
+                programacion_dia_retiro, programacion_hora_retiro, programacion_dia_vp, 
+                programacion_hora_vp, codigo_seguridad, cliente, centro_servicio, remesa,
+                usuario_reclamante, direccion, cus, cup, num_suministro, num_serie_medidor,
+                marca_medidor, modelo_medidor, anio_fabricacion, fabricante, procedencia,
+                tipo_medidor, diametro_nominal, q3, alcance, pma, tma, clase_sensibilidad,
+                certificado_aprobacion, num_certificado
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                item = VALUES(item),
+                fecha_os = VALUES(fecha_os),
+                cantidad_medidores = VALUES(cantidad_medidores),
+                tipo_servicio = VALUES(tipo_servicio),
+                updated_at = CURRENT_TIMESTAMP";
+            
+            $stmt = $pdo->prepare($sql);
+            $params = array_map('trim', $data);
+            
+            if ($stmt->execute($params)) {
+                $success++;
+            } else {
+                $errors++;
+            }
+        }
+        
+        $pdo->commit();
+        
+        $message = "Importación completada: $success registros importados exitosamente";
+        if ($errors > 0) {
+            $message .= ", $errors registros con errores";
+        }
+        $messageType = $errors > 0 ? 'warning' : 'success';
+        
+        // Actualizar total
+        $totalRegistros = $pdo->query("SELECT COUNT(*) as total FROM ordenes_servicio")->fetch()['total'];
+        
+    } catch (Exception $e) {
+        $pdo->rollback();
+        $message = "Error en la importación: " . $e->getMessage();
+        $messageType = 'error';
+    }
+}
 ?>
 
-<style>.upload-area {
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importar Datos - GASELAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .upload-area {
             border: 2px dashed #007bff;
             border-radius: 10px;
             padding: 40px;
@@ -32,9 +109,11 @@ require_once '../includes/header.php';
         }
         .progress-container {
             display: none;
-        }</style>
-
-<div class="container-fluid">
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
             <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
@@ -249,7 +328,7 @@ require_once '../includes/header.php';
         </div>
     </div>
 
-    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Funcionalidad de subida de archivos
         const uploadArea = document.getElementById('uploadArea');
@@ -334,5 +413,6 @@ require_once '../includes/header.php';
             });
         }
     </script>
+</body>
+</html>
 
-<?php require_once '../includes/footer.php'; ?>

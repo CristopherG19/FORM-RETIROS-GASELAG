@@ -1,15 +1,122 @@
 <?php
 require_once '../config/database.php';
 
+// Verificar autenticación
 requireRole(['admin', 'user']);
 
 $currentUser = getCurrentUser();
+$isFirstLogin = isset($_GET['first_login']) && $_GET['first_login'] == 1;
+$isAdmin = isAdmin();
 
-$pageTitle = 'Cambiar Contraseña - Sistema GASELAG';
-require_once '../includes/header.php';
+// Si no es primer login obligatorio y no fuerza cambio, permitir cancelar
+$canCancel = !$isFirstLogin && !$currentUser['force_password_change'];
+
+$message = '';
+$messageType = '';
+$errors = [];
+$strengthInfo = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $currentPassword = $_POST['current_password'] ?? '';
+    $newPassword = $_POST['new_password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
+    
+    try {
+        $pdo = getConnection();
+        
+        // Verificar contraseña actual
+        $stmt = $pdo->prepare("SELECT password FROM usuarios WHERE id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $user = $stmt->fetch();
+        
+        if (!password_verify($currentPassword, $user['password'])) {
+            $errors[] = "La contraseña actual es incorrecta";
+        } else {
+            // Validar nueva contraseña según el rol
+            if ($isAdmin) {
+                $validation = validatePassword($newPassword, $_SESSION['username'], $currentUser['email']);
+                $strengthInfo = $validation;
+            } else {
+                $validation = validatePIN($newPassword, $_SESSION['username']);
+            }
+            
+            if (!$validation['valid']) {
+                $errors = array_merge($errors, $validation['errors']);
+            } else {
+                // Verificar confirmación
+                if ($newPassword !== $confirmPassword) {
+                    $errors[] = "La nueva contraseña y la confirmación no coinciden";
+                } else {
+                    // Verificar que no sea igual a la actual
+                    if ($currentPassword === $newPassword) {
+                        $errors[] = $isAdmin ? "La nueva contraseña debe ser diferente a la actual" : "El nuevo PIN debe ser diferente al actual";
+                    } else {
+                        // Verificar historial (solo admins)
+                        if ($isAdmin && isPasswordReused($_SESSION['user_id'], $newPassword)) {
+                            $errors[] = "Esta contraseña ya fue utilizada anteriormente. Por favor, elija una diferente";
+                        } else {
+                            // Todo OK, actualizar contraseña
+                            $newHash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 8]);
+                            
+                            $pdo->beginTransaction();
+                            
+                            $stmt = $pdo->prepare("
+                                UPDATE usuarios 
+                                SET password = ?,
+                                    password_changed_at = NOW(),
+                                    force_password_change = FALSE
+                                WHERE id = ?
+                            ");
+                            $stmt->execute([$newHash, $_SESSION['user_id']]);
+                            
+                            $pdo->commit();
+                            
+                            // Guardar en historial (DESPUÉS del commit para evitar deadlocks)
+                            if ($isAdmin) {
+                                try {
+                                    savePasswordToHistory($_SESSION['user_id'], $newHash);
+                                } catch (Exception $e) {
+                                    error_log("Error guardando en historial: " . $e->getMessage());
+                                }
+                            }
+                            
+                            // Registrar en auditoría (DESPUÉS del commit para evitar deadlocks)
+                            try {
+                                logAudit(null, $_SESSION['user_id'], 'login', 
+                                        $isAdmin ? "Contraseña cambiada" : "PIN cambiado");
+                            } catch (Exception $e) {
+                                error_log("Error en auditoría: " . $e->getMessage());
+                            }
+                            
+                            $message = $isAdmin ? "Contraseña cambiada exitosamente" : "PIN cambiado exitosamente";
+                            $messageType = 'success';
+                            $redirecting = true; // Flag para ocultar formulario y mostrar mensaje
+                            
+                            // Redirigir después de 1 segundo
+                            header("refresh:1;url=../index.php?msg=password_changed");
+                        }
+                    }
+                }
+            }
+        }
+    } catch (Exception $e) {
+        if (isset($pdo) && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $errors[] = "Error al cambiar la contraseña: " . $e->getMessage();
+    }
+}
 ?>
-
-<style>body {
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cambiar <?php echo $isAdmin ? 'Contraseña' : 'PIN'; ?> - GASELAG</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
             background-color: #f5f7fa;
             min-height: 100vh;
             display: flex;
@@ -40,9 +147,11 @@ require_once '../includes/header.php';
         }
         .requirement-item.not-met {
             color: #6c757d;
-        }</style>
-
-<div class="container">
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
         <div class="row justify-content-center">
             <div class="col-12 col-md-10 col-lg-8 col-xl-6">
                 <div class="card shadow-sm border-0 change-password-card">
@@ -201,7 +310,7 @@ require_once '../includes/header.php';
         </div>
     </div>
     
-    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <?php if ($isAdmin): ?>
     <script>
         // Validación de fortaleza en tiempo real para admins
@@ -269,5 +378,5 @@ require_once '../includes/header.php';
         }
     </script>
     <?php endif; ?>
-
-<?php require_once '../includes/footer.php'; ?>
+</body>
+</html>

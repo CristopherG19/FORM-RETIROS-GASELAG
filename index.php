@@ -7,139 +7,83 @@ requireRole(['admin', 'user']);
 // Verificar si hay OCs en proceso
 $hasOCs = isset($_SESSION['selected_ocs']) && count($_SESSION['selected_ocs']) > 0;
 
-// Obtener información del usuario actual
-$currentUser = getCurrentUser();
+$pageTitle = 'Panel Principal - Sistema GASELAG';
+require_once 'includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GASELAG - Sistema de Retiro de Medidores</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <style>
-        /* Hero gradient header */
-        .hero-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 3rem 0;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        
-        /* Card hover effects - SIN MOVIMIENTO */
-        .module-card {
-            transition: box-shadow 0.3s ease;
-            cursor: pointer;
-            border: none;
-        }
-        .module-card:hover {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
-        }
-        .module-card .card-icon {
-            transition: opacity 0.3s ease;
-        }
-        .module-card:hover .card-icon {
-            opacity: 0.85;
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 767.98px) {
-            .hero-header {
-                padding: 2rem 0;
-            }
-            .hero-header h1 {
-                font-size: 1.75rem;
-            }
-        }
-        
-        /* Badge pulse animation */
-        .badge-pulse {
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-    </style>
-</head>
-<body class="bg-light">
-    <?php include 'includes/session_middleware.php'; ?>
-    
-    <!-- Barra de navegación simplificada -->
-    <nav class="navbar navbar-dark bg-dark shadow-sm">
-        <div class="container-fluid px-3 px-md-4">
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="index.php">
-                <i class="bi bi-speedometer2 me-2 fs-4"></i>
-                <span class="d-none d-sm-inline">GASELAG</span>
-            </a>
 
-            <div class="d-flex align-items-center gap-2 gap-md-3">
-                <!-- Info usuario -->
-                <div class="dropdown">
-                    <button class="btn btn-outline-light btn-sm dropdown-toggle d-flex align-items-center" 
-                            type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-person-circle me-1 me-md-2"></i>
-                        <span class="d-none d-md-inline"><?php echo htmlspecialchars($currentUser['nombre_completo']); ?></span>
-                        <span class="d-md-none">Perfil</span>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li class="px-3 py-2 border-bottom">
-                            <div class="fw-bold"><?php echo htmlspecialchars($currentUser['nombre_completo']); ?></div>
-                            <small class="text-muted"><?php echo htmlspecialchars($currentUser['email']); ?></small>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item" href="logout.php">
-                                <i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+<style>
+    /* Card hover effects - SIN MOVIMIENTO */
+    .module-card {
+        transition: box-shadow 0.3s ease;
+        cursor: pointer;
+        border: none;
+    }
+    .module-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+    }
+    .module-card .card-icon {
+        transition: opacity 0.3s ease;
+    }
+    .module-card:hover .card-icon {
+        opacity: 0.85;
+    }
+</style>
 
-    <!-- Hero Header -->
-    <div class="hero-header">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-lg-8 mx-auto text-center">
-                    <h1 class="fw-bold mb-3">
-                        <i class="bi bi-speedometer2 me-2"></i>
-                        Panel Principal
-                    </h1>
-                    <p class="lead mb-3 opacity-90">Sistema de Retiro de Medidores de Agua</p>
-                    <div class="d-flex flex-wrap justify-content-center gap-2">
-                        <span class="badge bg-light text-dark px-3 py-2">
-                            <i class="bi bi-person-circle me-1"></i>
-                            <?php echo htmlspecialchars($currentUser['nombre_completo']); ?>
+<!-- Hero Section -->
+<div class="bg-gradient py-5" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8 mx-auto text-center">
+                <h1 class="fw-bold mb-3" style="color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+                    <i class="bi bi-speedometer2 me-2"></i>
+                    Panel Principal
+                </h1>
+                <p class="lead mb-3" style="color: #2c3e50; font-weight: 700; font-size: 1.4rem; background-color: rgba(255,255,255,0.9); padding: 0.5rem 1.5rem; border-radius: 8px; display: inline-block;">
+                    Sistema de Retiro de Medidores de Agua
+                </p>
+                <div class="d-flex flex-wrap justify-content-center gap-2">
+                    <?php if (isAdmin()): ?>
+                        <span class="badge bg-warning text-dark px-3 py-2">
+                            <i class="bi bi-shield-check me-1"></i>
+                            Administrador
                         </span>
-                        <?php if (isAdmin()): ?>
-                            <span class="badge bg-warning text-dark px-3 py-2 badge-pulse">
-                                <i class="bi bi-shield-check me-1"></i>
-                                Administrador
-                            </span>
-                        <?php else: ?>
-                            <span class="badge bg-info px-3 py-2">
-                                <i class="bi bi-wrench-adjustable me-1"></i>
-                                Técnico
-                            </span>
-                        <?php endif; ?>
-                        <?php if ($hasOCs): ?>
-                            <span class="badge bg-success px-3 py-2 badge-pulse">
-                                <i class="bi bi-check-circle me-1"></i>
-                                OCs en Proceso
-                            </span>
-                        <?php endif; ?>
-                    </div>
+                    <?php else: ?>
+                        <span class="badge bg-info px-3 py-2">
+                            <i class="bi bi-wrench-adjustable me-1"></i>
+                            Técnico
+                        </span>
+                    <?php endif; ?>
+                    <?php if ($hasOCs): ?>
+                        <span class="badge bg-success px-3 py-2">
+                            <i class="bi bi-check-circle me-1"></i>
+                            OCs en Proceso
+                        </span>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="container pb-5">
+<div class="container py-4">
+
+        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'password_changed'): ?>
+        <!-- Mensaje de éxito al cambiar contraseña -->
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>¡Contraseña actualizada!</strong> Tu contraseña ha sido cambiada exitosamente.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_GET['login']) && $_GET['login'] === 'success'): ?>
+        <!-- Mensaje de bienvenida al iniciar sesión -->
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-person-check-fill me-2"></i>
+            <strong>¡Bienvenido, <?php echo htmlspecialchars($currentUser['nombre_completo']); ?>!</strong> Has iniciado sesión exitosamente.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        <?php endif; ?>
 
         <!-- Módulos Principales -->
         <div class="mb-4">
@@ -291,7 +235,7 @@ $currentUser = getCurrentUser();
 
             <!-- Gestión de Usuarios -->
             <div class="col-6 col-md-4 col-lg-3">
-                <div class="card module-card h-100 shadow-sm" onclick="location.href='pages/gestion_usuarios.php'">
+                <div class="card module-card h-100 shadow-sm" onclick="location.href='pages/gestion_usuarios_mejorado.php'">
                     <div class="card-body text-center p-3 p-md-4">
                         <i class="bi bi-people text-warning card-icon" style="font-size: 2.5rem;"></i>
                         <h6 class="card-title mt-3 mb-2">Gestión de Usuarios</h6>
@@ -439,8 +383,7 @@ $currentUser = getCurrentUser();
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<?php require_once 'includes/footer.php'; ?>
 

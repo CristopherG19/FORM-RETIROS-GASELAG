@@ -21,16 +21,12 @@ try {
 } catch (Exception $e) {
     die("Error al cargar datos: " . $e->getMessage());
 }
+
+$pageTitle = 'Vista Previa - Sistema GASELAG';
+require_once '../includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vista Previa - GASELAG</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <style>
+
+<style>
         /* Hero gradient header */
         .hero-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -122,26 +118,9 @@ try {
                 font-size: 0.875rem;
             }
         }
-    </style>
-</head>
-<body class="bg-light">
-    <?php include '../includes/session_middleware.php'; ?>
-    
-    <!-- Navbar -->
-    <nav class="navbar navbar-dark bg-dark shadow-sm">
-        <div class="container-fluid px-3 px-md-4">
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="../index.php">
-                <i class="bi bi-speedometer2 me-2 fs-4"></i>
-                <span class="d-none d-sm-inline">GASELAG</span>
-            </a>
-            <a href="buscar_oc.php" class="btn btn-outline-light btn-sm">
-                <i class="bi bi-arrow-left"></i>
-                <span class="d-none d-sm-inline"> Volver</span>
-            </a>
-        </div>
-    </nav>
+</style>
 
-    <!-- Hero Header -->
+<!-- Hero Header -->
     <div class="hero-header">
         <div class="container">
             <div class="row align-items-center">
@@ -426,7 +405,5 @@ try {
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<?php require_once '../includes/footer.php'; ?>
 

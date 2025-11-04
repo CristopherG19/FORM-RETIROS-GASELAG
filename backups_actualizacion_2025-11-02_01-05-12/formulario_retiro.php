@@ -349,12 +349,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'danger';
     }
 }
-
-$pageTitle = 'Registrar Retiro - ' . htmlspecialchars($currentOC);
-require_once '../includes/header.php';
 ?>
-
-<style>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de Retiro - <?= htmlspecialchars($currentOC) ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        /* Hero gradient header */
+        .hero-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
         /* Section titles ULTRA SUAVES */
         .section-title {
             background: linear-gradient(to right, #f8f9fa, #ffffff);
@@ -482,34 +495,68 @@ require_once '../includes/header.php';
         
         /* Responsive adjustments */
         @media (max-width: 767.98px) {
+            .hero-header {
+                padding: 1.5rem 0;
+            }
+            .hero-header h1 {
+                font-size: 1.5rem;
+            }
             .section-title {
                 font-size: 0.95rem;
                 padding: 10px 15px;
             }
         }
-</style>
-
-<div class="container py-4">
-    <!-- Badges de progreso -->
-    <div class="text-center mb-4">
-        <div class="d-flex flex-wrap justify-content-center gap-2">
-            <span class="badge bg-primary px-3 py-2">
-                <i class="bi bi-list-ol me-1"></i>
-                OC <?= $currentIndex + 1 ?> de <?= $totalOCs ?>
-            </span>
-            <span class="badge bg-warning text-dark px-3 py-2 badge-pulse">
-                <i class="bi bi-hourglass-split me-1"></i>
-                <?= round((($currentIndex + 1) / $totalOCs) * 100) ?>% Completado
-            </span>
-            <?php if ($totalOCs - $currentIndex > 1): ?>
-                <span class="badge bg-info px-3 py-2">
-                    <i class="bi bi-arrow-right me-1"></i>
-                    <?= $totalOCs - $currentIndex - 1 ?> pendiente<?= ($totalOCs - $currentIndex - 1) > 1 ? 's' : '' ?>
-                </span>
-            <?php endif; ?>
+    </style>
+</head>
+<body class="bg-light">
+    <?php include '../includes/session_middleware.php'; ?>
+    
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-3 px-md-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="../index.php">
+                <i class="bi bi-speedometer2 me-2 fs-4"></i>
+                <span class="d-none d-sm-inline">GASELAG</span>
+            </a>
+            <a href="vista_previa.php" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-arrow-left"></i>
+                <span class="d-none d-sm-inline"> Vista Previa</span>
+            </a>
         </div>
-        <h4 class="mt-3">Orden de Servicio: <strong><?= htmlspecialchars($currentOC) ?></strong></h4>
+    </nav>
+
+    <!-- Hero Header -->
+    <div class="hero-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-10 mx-auto text-center">
+                    <h1 class="fw-bold mb-2">
+                        <i class="bi bi-clipboard-data me-2"></i>
+                        Formulario de Retiro
+                    </h1>
+                    <p class="mb-3 opacity-90">Orden de Servicio: <strong><?= htmlspecialchars($currentOC) ?></strong></p>
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        <span class="badge bg-light text-dark px-3 py-2">
+                            <i class="bi bi-list-ol me-1"></i>
+                            OC <?= $currentIndex + 1 ?> de <?= $totalOCs ?>
+                        </span>
+                        <span class="badge bg-warning text-dark px-3 py-2 badge-pulse">
+                            <i class="bi bi-hourglass-split me-1"></i>
+                            <?= round((($currentIndex + 1) / $totalOCs) * 100) ?>% Completado
+                        </span>
+                        <?php if ($totalOCs - $currentIndex > 1): ?>
+                            <span class="badge bg-info px-3 py-2">
+                                <i class="bi bi-arrow-right me-1"></i>
+                                <?= $totalOCs - $currentIndex - 1 ?> pendiente<?= ($totalOCs - $currentIndex - 1) > 1 ? 's' : '' ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <div class="container pb-4">
         <!-- Barra de progreso visual -->
         <div class="card border-0 shadow-sm mb-4 progress-card">
             <div class="card-body p-3">
@@ -1189,5 +1236,6 @@ require_once '../includes/header.php';
             }
         });
     </script>
+</body>
+</html>
 
-<?php require_once '../includes/footer.php'; ?>
