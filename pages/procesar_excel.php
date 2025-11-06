@@ -98,16 +98,16 @@ function processExcelFile($filePath) {
             
             $stmt = $pdo->prepare($sql);
             
-            // Mapear datos a parámetros
+            // Mapear datos a parámetros (convertir fechas de DD/MM/YYYY a YYYY-MM-DD)
             $params = [
                 $data[0],  // item
                 $data[1],  // orden_servicio
-                !empty($data[2]) ? $data[2] : null,  // fecha_os
+                convertExcelDateToMySQL($data[2]),  // fecha_os
                 !empty($data[3]) ? intval($data[3]) : null,  // cantidad_medidores
                 $data[4],  // tipo_servicio
-                !empty($data[5]) ? $data[5] : null,  // programacion_dia_retiro
+                convertExcelDateToMySQL($data[5]),  // programacion_dia_retiro
                 $data[6],  // programacion_hora_retiro
-                !empty($data[7]) ? $data[7] : null,  // programacion_dia_vp
+                convertExcelDateToMySQL($data[7]),  // programacion_dia_vp
                 $data[8],  // programacion_hora_vp
                 $data[9],  // codigo_seguridad
                 $data[10], // cliente
@@ -175,6 +175,40 @@ function processExcelFile($filePath) {
 function validateDate($date, $format = 'Y-m-d') {
     $d = DateTime::createFromFormat($format, $date);
     return $d && $d->format($format) === $date;
+}
+
+/**
+ * Convierte fecha de formato DD/MM/YYYY (Excel) a YYYY-MM-DD (MySQL)
+ * @param string $date Fecha en formato DD/MM/YYYY
+ * @return string|null Fecha en formato YYYY-MM-DD o null si es inválida
+ */
+function convertExcelDateToMySQL($date) {
+    if (empty($date)) {
+        return null;
+    }
+    
+    // Limpiar espacios
+    $date = trim($date);
+    
+    // Si ya está en formato YYYY-MM-DD, retornar tal cual
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        return $date;
+    }
+    
+    // Intentar convertir DD/MM/YYYY a YYYY-MM-DD
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $date, $matches)) {
+        $day = $matches[1];
+        $month = $matches[2];
+        $year = $matches[3];
+        
+        // Validar que sea una fecha válida
+        if (checkdate($month, $day, $year)) {
+            return "$year-$month-$day";
+        }
+    }
+    
+    // Si no se pudo convertir, retornar null
+    return null;
 }
 
 function parseSimpleExcel($content) {

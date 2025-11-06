@@ -51,10 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
                 
                 $stmt = $pdo->prepare($sql);
                 
-                // Convertir fechas
-                $fecha_os = !empty($data[2]) ? date('Y-m-d', strtotime(str_replace('/', '-', $data[2]))) : null;
-                $prog_dia_retiro = !empty($data[5]) ? date('Y-m-d', strtotime(str_replace('/', '-', $data[5]))) : null;
-                $prog_dia_vp = !empty($data[7]) ? date('Y-m-d', strtotime(str_replace('/', '-', $data[7]))) : null;
+                // Convertir fechas de DD/MM/YYYY a YYYY-MM-DD
+                $fecha_os = convertExcelDateToMySQL($data[2]);
+                $prog_dia_retiro = convertExcelDateToMySQL($data[5]);
+                $prog_dia_vp = convertExcelDateToMySQL($data[7]);
                 
                 try {
                     $stmt->execute([
@@ -114,6 +114,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
         $message = "Error en la importación: " . $e->getMessage();
         $messageType = 'error';
     }
+}
+
+/**
+ * Convierte fecha de formato DD/MM/YYYY (Excel) a YYYY-MM-DD (MySQL)
+ * @param string $date Fecha en formato DD/MM/YYYY
+ * @return string|null Fecha en formato YYYY-MM-DD o null si es inválida
+ */
+function convertExcelDateToMySQL($date) {
+    if (empty($date)) {
+        return null;
+    }
+    
+    // Limpiar espacios
+    $date = trim($date);
+    
+    // Si ya está en formato YYYY-MM-DD, retornar tal cual
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        return $date;
+    }
+    
+    // Intentar convertir DD/MM/YYYY a YYYY-MM-DD
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $date, $matches)) {
+        $day = $matches[1];
+        $month = $matches[2];
+        $year = $matches[3];
+        
+        // Validar que sea una fecha válida
+        if (checkdate($month, $day, $year)) {
+            return "$year-$month-$day";
+        }
+    }
+    
+    // Si no se pudo convertir, retornar null
+    return null;
 }
 ?>
 
@@ -193,9 +227,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
     <!-- Estadísticas responsive -->
     <div class="row g-2 g-md-3 mb-3 mb-md-4">
                     <div class="col-12 col-sm-6 col-lg-4">
-                        <div class="card border-0 shadow-sm bg-primary text-white stat-card">
-                            <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-center">
+                        <div class="card border-0 shadow-sm bg-primary text-white stat-card h-100">
+                            <div class="card-body p-3 d-flex align-items-center">
+                                <div class="d-flex justify-content-between align-items-center w-100">
                                     <div class="flex-grow-1">
                                         <p class="mb-1 small opacity-75">Total de Registros</p>
                                         <h3 class="mb-0 fw-bold"><?php echo number_format($totalRegistros); ?></h3>
@@ -208,9 +242,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
                         </div>
                     </div>
                     <div class="col-12 col-sm-6 col-lg-4">
-                        <div class="card border-0 shadow-sm bg-success text-white stat-card">
-                            <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-center">
+                        <div class="card border-0 shadow-sm bg-success text-white stat-card h-100">
+                            <div class="card-body p-3 d-flex align-items-center">
+                                <div class="d-flex justify-content-between align-items-center w-100">
                                     <div class="flex-grow-1">
                                         <p class="mb-1 small opacity-75">Sistema</p>
                                         <h5 class="mb-0 fw-bold">Actualizado</h5>
@@ -224,9 +258,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csv_data'])) {
                         </div>
                     </div>
                     <div class="col-12 col-sm-12 col-lg-4">
-                        <div class="card border-0 shadow-sm bg-info text-white stat-card">
-                            <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-center">
+                        <div class="card border-0 shadow-sm bg-info text-white stat-card h-100">
+                            <div class="card-body p-3 d-flex align-items-center">
+                                <div class="d-flex justify-content-between align-items-center w-100">
                                     <div class="flex-grow-1">
                                         <p class="mb-1 small opacity-75">Formato</p>
                                         <h5 class="mb-0 fw-bold">CSV / Excel</h5>

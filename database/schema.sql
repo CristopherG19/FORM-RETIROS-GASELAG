@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
     bloqueado_hasta TIMESTAMP NULL,
     ultimo_intento TIMESTAMP NULL,
     force_password_change BOOLEAN DEFAULT FALSE,
+    primer_login BOOLEAN DEFAULT TRUE,
     password_changed_at TIMESTAMP NULL,
+    ultimo_cambio_password TIMESTAMP NULL,
     session_timeout INT DEFAULT 7200, -- 2 horas para técnicos, 1800 para admins
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -256,8 +258,8 @@ CREATE TABLE IF NOT EXISTS password_history (
 
 -- Insertar usuarios por defecto con session_timeout según rol
 -- Hashes optimizados con costo 8 para mejor performance en desarrollo
-INSERT IGNORE INTO usuarios (username, password, nombre_completo, email, rol, session_timeout, force_password_change) VALUES
-('admin', '$2y$08$BDvI2cPOUaeP41OFo7IaLOC5cg14vzLPyst4Bk1Qb9J2bpWxNDpTG', 'Administrador del Sistema', 'admin@gaselag.com', 'admin', 1800, TRUE),
-('12345678', '$2y$08$qtL6UBB1ZUKA6Pa9hyQ.d.R9puOt1s.JPjmMYqbBkGjK//ES2j2jG', 'Juan Pérez Técnico', 'tecnico1@gaselag.com', 'user', 7200, TRUE),
-('87654321', '$2y$08$5gv/1AGpd7ZA1mxmgV2XJeRMXTsAjqehO2uqyHqTI8UVLANdQ8UOG', 'María González Técnico', 'tecnico2@gaselag.com', 'user', 7200, TRUE);
+INSERT IGNORE INTO usuarios (username, password, nombre_completo, email, rol, session_timeout, force_password_change, primer_login) VALUES
+('admin', '$2y$08$BDvI2cPOUaeP41OFo7IaLOC5cg14vzLPyst4Bk1Qb9J2bpWxNDpTG', 'Administrador del Sistema', 'admin@gaselag.com', 'admin', 1800, TRUE, TRUE),
+('12345678', '$2y$08$qtL6UBB1ZUKA6Pa9hyQ.d.R9puOt1s.JPjmMYqbBkGjK//ES2j2jG', 'Juan Pérez Técnico', 'tecnico1@gaselag.com', 'user', 7200, TRUE, TRUE),
+('87654321', '$2y$08$5gv/1AGpd7ZA1mxmgV2XJeRMXTsAjqehO2uqyHqTI8UVLANdQ8UOG', 'María González Técnico', 'tecnico2@gaselag.com', 'user', 7200, TRUE, TRUE);
 -- Nota: Password por defecto es 'password' para todos. Deben cambiarla en el primer login.

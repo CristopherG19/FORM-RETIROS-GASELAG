@@ -16,6 +16,24 @@ $itemsPorPagina = 20;
 $pagina = isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1;
 $offset = ($pagina - 1) * $itemsPorPagina;
 
+// Procesar asignación de OC a técnico
+$mensaje_asignacion = '';
+$tipo_mensaje_asignacion = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['asignar_oc'])) {
+    $oc = $_POST['orden_servicio'];
+    $tecnicoId = intval($_POST['tecnico_id']);
+    $notas = trim($_POST['notas_admin'] ?? '');
+    
+    $resultado = asignarOCATecnico($oc, $tecnicoId, $_SESSION['user_id'], $notas);
+    
+    $mensaje_asignacion = $resultado['message'];
+    $tipo_mensaje_asignacion = $resultado['success'] ? 'success' : 'danger';
+}
+
+// Obtener lista de técnicos activos para el modal
+$tecnicos = getTecnicosActivos();
+
 try {
     $pdo = getConnection();
 
@@ -167,6 +185,15 @@ require_once '../includes/header.php';
 </style>
 
 <div class="container-fluid px-4 py-4">
+
+        <!-- Mensaje de asignación -->
+        <?php if ($mensaje_asignacion): ?>
+            <div class="alert alert-<?= $tipo_mensaje_asignacion ?> alert-dismissible fade show">
+                <i class="bi bi-<?= $tipo_mensaje_asignacion === 'success' ? 'check-circle' : 'exclamation-triangle' ?>"></i>
+                <?= htmlspecialchars($mensaje_asignacion) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
 
         <!-- Título y descripción -->
         <div class="card border-0 shadow-sm mb-4">
@@ -320,16 +347,27 @@ require_once '../includes/header.php';
                                 <?php foreach ($ocs as $oc): ?>
                                     <tr class="<?= $oc['dias_vencido'] > 0 && $oc['estado_registro'] === 'Pendiente' ? 'vencido' : '' ?>">
                                         <td>
-                                            <?php if (!empty($oc['programacion_dia_retiro'])): ?>
+                                            <?php 
+                                            // Validar fecha válida (no NULL, no vacía, no 0000-00-00)
+                                            $fechaValida = !empty($oc['programacion_dia_retiro']) && 
+                                                          $oc['programacion_dia_retiro'] !== '0000-00-00' &&
+                                                          strtotime($oc['programacion_dia_retiro']) !== false;
+                                            ?>
+                                            <?php if ($fechaValida): ?>
                                                 <?= date('d/m/Y', strtotime($oc['programacion_dia_retiro'])) ?>
                                                 <?php if ($oc['programacion_hora_retiro']): ?>
-                                                    <br><small class="text-muted"><?= $oc['programacion_hora_retiro'] ?></small>
+                                                    <br><small class="text-muted"><?= htmlspecialchars($oc['programacion_hora_retiro']) ?></small>
                                                 <?php endif; ?>
                                                 <?php if ($oc['dias_vencido'] > 0 && $oc['estado_registro'] === 'Pendiente'): ?>
                                                     <br><span class="badge bg-danger">Vencido <?= $oc['dias_vencido'] ?> días</span>
                                                 <?php endif; ?>
                                             <?php else: ?>
-                                                <span class="text-muted">N/A</span>
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-calendar-x"></i> Sin programar
+                                                </span>
+                                                <?php if ($oc['programacion_hora_retiro']): ?>
+                                                    <br><small class="text-muted">Hora: <?= htmlspecialchars($oc['programacion_hora_retiro']) ?></small>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </td>
                                         <td><strong><?= htmlspecialchars($oc['orden_servicio']) ?></strong></td>
@@ -374,9 +412,9 @@ require_once '../includes/header.php';
                                                     <i class="bi bi-eye"></i>
                                                 </button>
                                                 <?php if ($oc['estado_registro'] === 'Pendiente'): ?>
-                                                    <a href="buscar_oc.php?oc=<?= urlencode($oc['orden_servicio']) ?>" class="btn btn-primary" title="Registrar retiro">
-                                                        <i class="bi bi-clipboard-check"></i>
-                                                    </a>
+                                                    <button class="btn btn-primary" onclick="abrirModalAsignar('<?= htmlspecialchars($oc['orden_servicio']) ?>', '<?= htmlspecialchars($oc['id']) ?>')" title="Asignar a técnico">
+                                                        <i class="bi bi-person-plus"></i>
+                                                    </button>
                                                 <?php endif; ?>
                                             </div>
                                         </td>
@@ -460,6 +498,66 @@ require_once '../includes/header.php';
         </div>
     </div>
 
+    <!-- Modal para asignar OC a técnico -->
+    <div class="modal fade" id="asignarModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <form method="POST" action="">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-person-plus-fill me-2"></i>Asignar OC a Técnico
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <input type="hidden" name="asignar_oc" value="1">
+                        <input type="hidden" name="orden_servicio" id="modal_orden_servicio">
+                        <input type="hidden" name="orden_servicio_id" id="modal_orden_servicio_id">
+                        
+                        <div class="alert alert-info border-0 mb-4">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            <strong>OC:</strong> <span id="modal_oc_display" class="badge bg-dark ms-2"></span>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="tecnico_id" class="form-label fw-bold">
+                                <i class="bi bi-person-check"></i> Seleccionar Técnico *
+                            </label>
+                            <select class="form-select form-select-lg" id="tecnico_id" name="tecnico_id" required>
+                                <option value="">Seleccione un técnico...</option>
+                                <?php foreach ($tecnicos as $tecnico): ?>
+                                    <option value="<?= $tecnico['id'] ?>">
+                                        <?= htmlspecialchars($tecnico['nombre_completo']) ?> 
+                                        (<?= htmlspecialchars($tecnico['username']) ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text">
+                                <i class="bi bi-lightbulb"></i> El técnico verá esta OC en su lista de OCs asignadas
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notas_admin" class="form-label fw-bold">
+                                <i class="bi bi-chat-left-text"></i> Notas para el técnico (opcional)
+                            </label>
+                            <textarea class="form-control" id="notas_admin" name="notas_admin" rows="3" 
+                                      placeholder="Ej: Prioridad alta, coordinar con cliente..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-circle-fill"></i> Asignar OC
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal para ver detalle -->
     <div class="modal fade" id="detalleModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -501,6 +599,21 @@ require_once '../includes/header.php';
                     document.getElementById('detalleContent').innerHTML = 
                         '<div class="alert alert-danger">Error al cargar los datos</div>';
                 });
+        }
+
+        function abrirModalAsignar(ordenServicio, ordenServicioId) {
+            // Rellenar campos del modal
+            document.getElementById('modal_orden_servicio').value = ordenServicio;
+            document.getElementById('modal_orden_servicio_id').value = ordenServicioId;
+            document.getElementById('modal_oc_display').textContent = ordenServicio;
+            
+            // Limpiar campos
+            document.getElementById('tecnico_id').value = '';
+            document.getElementById('notas_admin').value = '';
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('asignarModal'));
+            modal.show();
         }
 
         function exportarExcel() {

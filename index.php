@@ -7,6 +7,12 @@ requireRole(['admin', 'user']);
 // Verificar si hay OCs en proceso
 $hasOCs = isset($_SESSION['selected_ocs']) && count($_SESSION['selected_ocs']) > 0;
 
+// Para técnicos: obtener cantidad de OCs asignadas pendientes
+$ocsAsignadasPendientes = 0;
+if (!isAdmin()) {
+    $ocsAsignadasPendientes = countOCsPendientesTecnico($_SESSION['user_id']);
+}
+
 $pageTitle = 'Panel Principal - Sistema GASELAG';
 require_once 'includes/header.php';
 ?>
@@ -34,11 +40,11 @@ require_once 'includes/header.php';
     <div class="container">
         <div class="row align-items-center">
             <div class="col-lg-8 mx-auto text-center">
-                <h1 class="fw-bold mb-3" style="color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+                <h1 class="fw-bold mb-3" style="color: rgba(33, 37, 41, 0.75);">
                     <i class="bi bi-speedometer2 me-2"></i>
                     Panel Principal
                 </h1>
-                <p class="lead mb-3" style="color: #2c3e50; font-weight: 700; font-size: 1.4rem; background-color: rgba(255,255,255,0.9); padding: 0.5rem 1.5rem; border-radius: 8px; display: inline-block;">
+                <p class="lead mb-3" style="color: rgba(33, 37, 41, 0.75); font-weight: 700; font-size: 1.4rem;">
                     Sistema de Retiro de Medidores de Agua
                 </p>
                 <div class="d-flex flex-wrap justify-content-center gap-2">
@@ -139,8 +145,28 @@ require_once 'includes/header.php';
                     </div>
                 </div>
             <?php else: ?>
+                <!-- Mis OCs Asignadas (Técnico) -->
+                <div class="col-6 col-md-4">
+                    <div class="card module-card h-100 shadow-sm" onclick="location.href='pages/mis_ocs_asignadas.php'">
+                        <div class="card-body text-center p-4">
+                            <i class="bi bi-person-check text-success card-icon" style="font-size: 3rem;"></i>
+                            <h5 class="card-title mt-3 mb-2">Mis OCs Asignadas</h5>
+                            <p class="card-text text-muted">OCs asignadas por el administrador</p>
+                            <?php if ($ocsAsignadasPendientes > 0): ?>
+                                <span class="badge bg-warning text-dark mt-2" style="animation: pulse 2s infinite;">
+                                    <i class="bi bi-exclamation-circle"></i> <?= $ocsAsignadasPendientes ?> pendiente<?= $ocsAsignadasPendientes > 1 ? 's' : '' ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary mt-2">
+                                    <i class="bi bi-check-circle"></i> Al día
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            
                 <!-- Registrar Retiro (Técnico) -->
-                <div class="col-6 col-md-6">
+                <div class="col-6 col-md-4">
                     <div class="card module-card h-100 shadow-sm" onclick="location.href='pages/buscar_oc.php'">
                         <div class="card-body text-center p-4">
                             <i class="bi bi-clipboard-check text-primary card-icon" style="font-size: 3rem;"></i>
@@ -156,7 +182,7 @@ require_once 'includes/header.php';
                 </div>
 
                 <!-- Consultar Registros (Técnico) -->
-                <div class="col-6 col-md-6">
+                <div class="col-6 col-md-4">
                     <div class="card module-card h-100 shadow-sm" onclick="location.href='pages/consultar_retiros.php'">
                         <div class="card-body text-center p-4">
                             <i class="bi bi-search text-info card-icon" style="font-size: 3rem;"></i>

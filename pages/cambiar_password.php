@@ -4,21 +4,151 @@ require_once '../config/database.php';
 requireRole(['admin', 'user']);
 
 $currentUser = getCurrentUser();
+$isAdmin = ($currentUser['rol'] === 'admin');
+$isFirstLogin = ($_GET['first_login'] ?? 0) == 1 || $currentUser['primer_login'] == 1;
+$canCancel = !$isFirstLogin && !$currentUser['force_password_change'];
+
+// Variables para mensajes
+$message = '';
+$messageType = 'info';
+$errors = [];
+$redirecting = false;
+
+// Procesar formulario de cambio de contraseña
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $currentPassword = $_POST['current_password'] ?? '';
+    $newPassword = $_POST['new_password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
+    
+    // Validaciones básicas
+    if (empty($currentPassword) || empty($newPassword) || empty($confirmPassword)) {
+        $errors[] = 'Todos los campos son obligatorios';
+    }
+    
+    if ($newPassword !== $confirmPassword) {
+        $errors[] = 'La nueva contraseña y la confirmación no coinciden';
+    }
+    
+    if (empty($errors)) {
+        try {
+            $pdo = getConnection();
+            
+            // Verificar contraseña actual
+            $stmt = $pdo->prepare("SELECT password FROM usuarios WHERE id = ?");
+            $stmt->execute([$currentUser['id']]);
+            $user = $stmt->fetch();
+            
+            if (!$user || !password_verify($currentPassword, $user['password'])) {
+                $errors[] = 'La contraseña actual es incorrecta';
+            } else {
+                // Validar nueva contraseña según el rol
+                if ($isAdmin) {
+                    // Validación para admin (contraseña compleja)
+                    if (strlen($newPassword) < PASSWORD_MIN_LENGTH_ADMIN) {
+                        $errors[] = 'La contraseña debe tener al menos ' . PASSWORD_MIN_LENGTH_ADMIN . ' caracteres';
+                    }
+                    if (!preg_match('/[A-Z]/', $newPassword)) {
+                        $errors[] = 'La contraseña debe contener al menos una letra mayúscula';
+                    }
+                    if (!preg_match('/[a-z]/', $newPassword)) {
+                        $errors[] = 'La contraseña debe contener al menos una letra minúscula';
+                    }
+                    if (preg_match_all('/[0-9]/', $newPassword) < PASSWORD_REQUIRE_NUMBERS_ADMIN) {
+                        $errors[] = 'La contraseña debe contener al menos ' . PASSWORD_REQUIRE_NUMBERS_ADMIN . ' números';
+                    }
+                    if (preg_match_all('/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/', $newPassword) < PASSWORD_REQUIRE_SYMBOLS_ADMIN) {
+                        $errors[] = 'La contraseña debe contener al menos ' . PASSWORD_REQUIRE_SYMBOLS_ADMIN . ' símbolos especiales';
+                    }
+                    // Palabras comunes prohibidas
+                    $commonPasswords = ['password', 'admin', 'administrador', 'gaselag', '123456', 'qwerty'];
+                    foreach ($commonPasswords as $common) {
+                        if (stripos($newPassword, $common) !== false) {
+                            $errors[] = 'La contraseña no debe contener palabras comunes';
+                            break;
+                        }
+                    }
+                } else {
+                    // Validación para usuario (PIN numérico)
+                    if (!ctype_digit($newPassword)) {
+                        $errors[] = 'El PIN debe contener solo números';
+                    }
+                    $pinLength = strlen($newPassword);
+                    if ($pinLength < PIN_MIN_LENGTH_USER || $pinLength > PIN_MAX_LENGTH_USER) {
+                        $errors[] = 'El PIN debe tener entre ' . PIN_MIN_LENGTH_USER . ' y ' . PIN_MAX_LENGTH_USER . ' dígitos';
+                    }
+                    // PINs comunes prohibidos
+                    $commonPins = ['1234', '4321', '0000', '1111', '2222', '5555', '1212', '0123'];
+                    if (in_array($newPassword, $commonPins)) {
+                        $errors[] = 'El PIN es demasiado común, elija uno más seguro';
+                    }
+                    // Verificar secuencias
+                    if (preg_match('/(?:0123|1234|2345|3456|4567|5678|6789|9876|8765|7654|6543|5432|4321|3210)/', $newPassword)) {
+                        $errors[] = 'El PIN no debe ser una secuencia numérica';
+                    }
+                    // Verificar todos los dígitos iguales
+                    if (preg_match('/^(\d)\1+$/', $newPassword)) {
+                        $errors[] = 'El PIN no debe tener todos los dígitos iguales';
+                    }
+                }
+                
+                // Si no hay errores, actualizar contraseña
+                if (empty($errors)) {
+                    $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+                    
+                    // Actualizar contraseña y resetear flags de primer login
+                    $updateStmt = $pdo->prepare("
+                        UPDATE usuarios 
+                        SET password = ?,
+                            force_password_change = 0,
+                            primer_login = 0,
+                            ultimo_cambio_password = NOW()
+                        WHERE id = ?
+                    ");
+                    
+                    if ($updateStmt->execute([$hashedPassword, $currentUser['id']])) {
+                        // Registrar en auditoría
+                        logAudit(null, $currentUser['id'], 'cambio_password', 
+                                'Cambio de ' . ($isAdmin ? 'contraseña' : 'PIN') . ' exitoso');
+                        
+                        $message = $isAdmin ? 
+                            'Contraseña actualizada exitosamente' : 
+                            'PIN actualizado exitosamente';
+                        $messageType = 'success';
+                        $redirecting = true;
+                        
+                        // Actualizar sesión para reflejar cambios
+                        $_SESSION['password_changed'] = true;
+                        
+                        // Redirigir después de 2 segundos
+                        header("refresh:2;url=../index.php");
+                    } else {
+                        $errors[] = 'Error al actualizar la contraseña. Intente nuevamente';
+                    }
+                }
+            }
+        } catch (PDOException $e) {
+            error_log("Error cambiando contraseña: " . $e->getMessage());
+            $errors[] = 'Error del sistema. Por favor, contacte al administrador';
+        }
+    }
+}
 
 $pageTitle = 'Cambiar Contraseña - Sistema GASELAG';
 require_once '../includes/header.php';
 ?>
 
-<style>body {
+<style>
+        body {
             background-color: #f5f7fa;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        }
+        .change-password-container {
+            padding-top: 3rem;
+            padding-bottom: 3rem;
         }
         .change-password-card {
-            max-width: 500px;
-            margin: 2rem auto;
+            max-width: 600px;
+            margin: 0 auto;
         }
         .strength-meter {
             height: 5px;
@@ -40,11 +170,12 @@ require_once '../includes/header.php';
         }
         .requirement-item.not-met {
             color: #6c757d;
-        }</style>
+        }
+</style>
 
-<div class="container">
+<div class="container change-password-container">
         <div class="row justify-content-center">
-            <div class="col-12 col-md-10 col-lg-8 col-xl-6">
+            <div class="col-12 col-md-10 col-lg-8">
                 <div class="card shadow-sm border-0 change-password-card">
                     <div class="card-header bg-primary text-white py-3">
                         <h5 class="mb-0">
@@ -110,7 +241,12 @@ require_once '../includes/header.php';
                                        class="form-control <?php echo $isAdmin ? '' : 'text-center'; ?>" 
                                        id="current_password" 
                                        name="current_password"
-                                       <?php echo $isAdmin ? '' : 'inputmode="numeric" pattern="[0-9]*"'; ?>
+                                       <?php 
+                                       // Solo validar como numérico si NO es primer login (ya cambió su password/PIN)
+                                       if (!$isAdmin && !$isFirstLogin && !$currentUser['primer_login']) {
+                                           echo 'inputmode="numeric" pattern="[0-9]*"';
+                                       }
+                                       ?>
                                        required
                                        autocomplete="current-password">
                             </div>

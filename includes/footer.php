@@ -14,7 +14,7 @@
                         Sistema de Gestión de Retiro de Medidores de Gas Natural
                     </p>
                     <p class="text-white-50 small mb-0">
-                        <i class="bi bi-geo-alt me-2"></i>Guatemala, Centroamérica
+                        <i class="bi bi-geo-alt me-2"></i>San Luis, Lima
                     </p>
                 </div>
                 

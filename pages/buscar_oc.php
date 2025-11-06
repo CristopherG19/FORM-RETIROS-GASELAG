@@ -14,6 +14,57 @@ $message = '';
 $messageType = '';
 $ocData = null;
 
+// ===== MANEJO DE OCs ASIGNADAS =====
+// Si viene desde "Mis OCs Asignadas", agregar automáticamente y redirigir
+if (isset($_GET['oc_asignada']) && !empty($_GET['oc_asignada'])) {
+    $ocAsignada = trim($_GET['oc_asignada']);
+    
+    try {
+        $pdo = getConnection();
+        
+        // Verificar que la OC existe
+        $stmt = $pdo->prepare("SELECT orden_servicio FROM ordenes_servicio WHERE orden_servicio = ?");
+        $stmt->execute([$ocAsignada]);
+        
+        if ($stmt->fetch()) {
+            // Verificar que NO esté ya registrada
+            $existingRetiro = checkExistingRetiro($ocAsignada);
+            
+            if (!$existingRetiro) {
+                // Limpiar sesión y agregar solo esta OC
+                $_SESSION['selected_ocs'] = [$ocAsignada];
+                
+                // Registrar en auditoría
+                logAudit(null, $_SESSION['user_id'], 'busqueda_oc',
+                         "OC asignada agregada automáticamente: $ocAsignada",
+                         $ocAsignada);
+                
+                // Marcar asignación como "en proceso" si estaba pendiente
+                $stmtAsignacion = $pdo->prepare("SELECT id FROM asignaciones_oc WHERE orden_servicio = ? AND tecnico_id = ? AND estado = 'pendiente'");
+                $stmtAsignacion->execute([$ocAsignada, $_SESSION['user_id']]);
+                $asignacion = $stmtAsignacion->fetch();
+                
+                if ($asignacion) {
+                    iniciarTrabajoAsignacion($asignacion['id'], $_SESSION['user_id']);
+                }
+                
+                // Redirigir directo al formulario
+                header('Location: formulario_retiro.php?index=0');
+                exit;
+            } else {
+                $message = "⚠️ Esta OC ya fue registrada anteriormente por {$existingRetiro['tecnico_responsable']}";
+                $messageType = 'warning';
+            }
+        } else {
+            $message = "❌ La OC {$ocAsignada} no existe en el sistema";
+            $messageType = 'danger';
+        }
+    } catch (Exception $e) {
+        $message = "Error: " . $e->getMessage();
+        $messageType = 'danger';
+    }
+}
+
 // Buscar OC
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['buscar_oc'])) {
     $oc_numero = trim($_POST['oc_code']);

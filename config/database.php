@@ -268,6 +268,9 @@ function requireRole($requiredRoles) {
         exit;
     }
 
+    // ⚠️ IMPORTANTE: Verificar si debe cambiar contraseña ANTES de verificar roles
+    checkPasswordChangeRequired();
+
     if (!in_array(getUserRole(), $requiredRoles)) {
         // Redirigir según el rol del usuario y ubicación actual
         $isInPages = (strpos($_SERVER['PHP_SELF'], '/pages/') !== false);
@@ -292,7 +295,8 @@ function getCurrentUser() {
     $pdo = getConnection();
 
     try {
-        $sql = "SELECT id, username, nombre_completo, email, rol, estado, ultimo_login
+        $sql = "SELECT id, username, nombre_completo, email, rol, estado, ultimo_login, 
+                       force_password_change, primer_login
                 FROM usuarios WHERE id = :id";
 
         $stmt = $pdo->prepare($sql);
@@ -303,6 +307,46 @@ function getCurrentUser() {
     } catch (PDOException $e) {
         error_log("Error al obtener usuario: " . $e->getMessage());
         return null;
+    }
+}
+
+// Función para verificar si el usuario debe cambiar su contraseña obligatoriamente
+function mustChangePassword() {
+    if (!isLoggedIn()) {
+        return false;
+    }
+    
+    $user = getCurrentUser();
+    if (!$user) {
+        return false;
+    }
+    
+    return ($user['force_password_change'] == 1 || $user['primer_login'] == 1);
+}
+
+// Middleware: Redirigir a cambio de contraseña si es obligatorio
+function checkPasswordChangeRequired() {
+    if (!isLoggedIn()) {
+        return;
+    }
+    
+    // Páginas permitidas sin cambiar contraseña
+    $currentPage = basename($_SERVER['PHP_SELF']);
+    $allowedPages = ['cambiar_password.php', 'logout.php', 'ping.php'];
+    
+    // Si debe cambiar contraseña y no está en página permitida
+    if (mustChangePassword() && !in_array($currentPage, $allowedPages)) {
+        // Guardar la URL a la que intentaba acceder
+        if (!isset($_SESSION['redirect_after_password_change'])) {
+            $_SESSION['redirect_after_password_change'] = $_SERVER['REQUEST_URI'];
+        }
+        
+        // Determinar ruta a cambiar_password.php
+        $isInPages = (strpos($_SERVER['PHP_SELF'], '/pages/') !== false);
+        $passwordChangePath = $isInPages ? 'cambiar_password.php' : 'pages/cambiar_password.php';
+        
+        header('Location: ' . $passwordChangePath . '?required=1');
+        exit;
     }
 }
 
@@ -1476,6 +1520,340 @@ function validateCSRFToken($token) {
     }
     
     return hash_equals($_SESSION['csrf_token'], $token);
+}
+
+// =========================================================================
+// FUNCIONES DE ASIGNACIÓN DE OCS A TÉCNICOS
+// =========================================================================
+
+/**
+ * Asignar una OC a un técnico
+ * @param string $ordenServicio Número de la OC (ej: OC-73772)
+ * @param int $tecnicoId ID del técnico
+ * @param int $adminId ID del admin que asigna
+ * @param string $notas Notas opcionales del admin
+ * @return array ['success' => bool, 'message' => string, 'id' => int|null]
+ */
+function asignarOCATecnico($ordenServicio, $tecnicoId, $adminId, $notas = '') {
+    $pdo = getConnection();
+    
+    try {
+        // 1. Verificar que la OC existe
+        $stmtOC = $pdo->prepare("SELECT id, orden_servicio FROM ordenes_servicio WHERE orden_servicio = ?");
+        $stmtOC->execute([$ordenServicio]);
+        $oc = $stmtOC->fetch();
+        
+        if (!$oc) {
+            return ['success' => false, 'message' => "La OC {$ordenServicio} no existe en el sistema", 'id' => null];
+        }
+        
+        // 2. Verificar que no tenga retiro registrado
+        $stmtRetiro = $pdo->prepare("SELECT id FROM retiros_medidores WHERE orden_servicio = ? AND estado_registro = 'activo'");
+        $stmtRetiro->execute([$ordenServicio]);
+        if ($stmtRetiro->fetch()) {
+            return ['success' => false, 'message' => "Esta OC ya tiene un retiro registrado", 'id' => null];
+        }
+        
+        // 3. Verificar que no esté ya asignada en estado pendiente/en_proceso
+        $stmtAsignacion = $pdo->prepare("SELECT id FROM asignaciones_oc WHERE orden_servicio = ? AND estado IN ('pendiente', 'en_proceso')");
+        $stmtAsignacion->execute([$ordenServicio]);
+        if ($stmtAsignacion->fetch()) {
+            return ['success' => false, 'message' => "Esta OC ya está asignada a un técnico", 'id' => null];
+        }
+        
+        // 4. Obtener nombres
+        $stmtTecnico = $pdo->prepare("SELECT nombre_completo FROM usuarios WHERE id = ? AND rol = 'user' AND estado = 'activo'");
+        $stmtTecnico->execute([$tecnicoId]);
+        $tecnico = $stmtTecnico->fetch();
+        
+        if (!$tecnico) {
+            return ['success' => false, 'message' => "El técnico no existe o no está activo", 'id' => null];
+        }
+        
+        $stmtAdmin = $pdo->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
+        $stmtAdmin->execute([$adminId]);
+        $admin = $stmtAdmin->fetch();
+        
+        // 5. Crear asignación
+        $sqlInsert = "INSERT INTO asignaciones_oc (
+            orden_servicio_id, orden_servicio, tecnico_id, tecnico_nombre,
+            admin_asigno_id, admin_nombre, estado, notas_admin
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)";
+        
+        $stmtInsert = $pdo->prepare($sqlInsert);
+        $stmtInsert->execute([
+            $oc['id'],
+            $ordenServicio,
+            $tecnicoId,
+            $tecnico['nombre_completo'],
+            $adminId,
+            $admin['nombre_completo'],
+            $notas
+        ]);
+        
+        $asignacionId = $pdo->lastInsertId();
+        
+        // 6. Auditoría
+        logAudit(null, $adminId, 'asignacion_oc_individual',
+                "OC {$ordenServicio} asignada a {$tecnico['nombre_completo']}",
+                $ordenServicio);
+        
+        return [
+            'success' => true,
+            'message' => "OC asignada exitosamente a {$tecnico['nombre_completo']}",
+            'id' => $asignacionId
+        ];
+        
+    } catch (PDOException $e) {
+        error_log("Error al asignar OC: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Error en la base de datos', 'id' => null];
+    }
+}
+
+/**
+ * Asignar múltiples OCs a un técnico de forma masiva
+ * @param array $ordenesServicio Array de números de OC
+ * @param int $tecnicoId ID del técnico
+ * @param int $adminId ID del admin que asigna
+ * @param string $notas Notas opcionales
+ * @return array ['success' => bool, 'total' => int, 'exitosas' => int, 'fallidas' => int, 'errores' => array]
+ */
+function asignarOCsMasivamente($ordenesServicio, $tecnicoId, $adminId, $notas = '') {
+    $pdo = getConnection();
+    $exitosas = 0;
+    $fallidas = 0;
+    $errores = [];
+    
+    try {
+        $pdo->beginTransaction();
+        
+        // Obtener nombres para el log
+        $stmtTecnico = $pdo->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
+        $stmtTecnico->execute([$tecnicoId]);
+        $tecnico = $stmtTecnico->fetch();
+        
+        $stmtAdmin = $pdo->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
+        $stmtAdmin->execute([$adminId]);
+        $admin = $stmtAdmin->fetch();
+        
+        foreach ($ordenesServicio as $oc) {
+            $resultado = asignarOCATecnico($oc, $tecnicoId, $adminId, $notas);
+            
+            if ($resultado['success']) {
+                $exitosas++;
+            } else {
+                $fallidas++;
+                $errores[] = ['oc' => $oc, 'error' => $resultado['message']];
+            }
+        }
+        
+        // Guardar log de asignación masiva
+        $sqlLog = "INSERT INTO asignaciones_masivas_log (
+            admin_id, admin_nombre, tecnico_id, tecnico_nombre,
+            total_ocs_asignadas, ocs_asignadas, notas
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        
+        $stmtLog = $pdo->prepare($sqlLog);
+        $stmtLog->execute([
+            $adminId,
+            $admin['nombre_completo'],
+            $tecnicoId,
+            $tecnico['nombre_completo'],
+            $exitosas,
+            json_encode($ordenesServicio),
+            $notas
+        ]);
+        
+        // Auditoría
+        logAudit(null, $adminId, 'asignacion_oc_masiva',
+                "{$exitosas} OCs asignadas masivamente a {$tecnico['nombre_completo']}",
+                implode(', ', array_slice($ordenesServicio, 0, 5)) . ($exitosas > 5 ? '...' : ''));
+        
+        $pdo->commit();
+        
+        return [
+            'success' => true,
+            'total' => count($ordenesServicio),
+            'exitosas' => $exitosas,
+            'fallidas' => $fallidas,
+            'errores' => $errores
+        ];
+        
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        error_log("Error en asignación masiva: " . $e->getMessage());
+        return [
+            'success' => false,
+            'total' => count($ordenesServicio),
+            'exitosas' => $exitosas,
+            'fallidas' => $fallidas,
+            'errores' => $errores
+        ];
+    }
+}
+
+/**
+ * Obtener OCs asignadas a un técnico
+ * @param int $tecnicoId ID del técnico
+ * @param string $estado Estado: 'pendiente', 'en_proceso', 'completada', 'todas'
+ * @return array Lista de asignaciones
+ */
+function getOCsAsignadasTecnico($tecnicoId, $estado = 'pendiente') {
+    $pdo = getConnection();
+    
+    try {
+        // Si se pide "todas", consultar directamente la tabla con todas las asignaciones
+        if ($estado === 'todas') {
+            $sql = "SELECT 
+                a.id,
+                a.orden_servicio,
+                a.tecnico_id,
+                a.tecnico_nombre,
+                a.admin_nombre,
+                a.estado,
+                a.fecha_asignacion,
+                a.fecha_completada,
+                a.notas_admin,
+                o.cliente,
+                o.direccion,
+                o.num_suministro,
+                o.num_serie_medidor,
+                o.programacion_dia_retiro,
+                o.programacion_hora_retiro,
+                CASE 
+                    WHEN r.id IS NOT NULL THEN r.medidor_retirado
+                    ELSE 'PENDIENTE'
+                END as estado_retiro,
+                DATEDIFF(CURDATE(), a.fecha_asignacion) as dias_desde_asignacion
+            FROM asignaciones_oc a
+            INNER JOIN ordenes_servicio o ON a.orden_servicio_id = o.id
+            LEFT JOIN retiros_medidores r ON o.id = r.orden_servicio_id AND r.estado_registro = 'activo'
+            WHERE a.tecnico_id = ?
+            ORDER BY 
+                CASE a.estado 
+                    WHEN 'pendiente' THEN 1
+                    WHEN 'en_proceso' THEN 2
+                    WHEN 'completada' THEN 3
+                    ELSE 4
+                END,
+                a.fecha_asignacion DESC";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$tecnicoId]);
+        } else {
+            // Para estados específicos, usar la vista optimizada
+            $sql = "SELECT * FROM v_asignaciones_pendientes WHERE tecnico_id = ? AND estado = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$tecnicoId, $estado]);
+        }
+        
+        return $stmt->fetchAll();
+        
+    } catch (PDOException $e) {
+        error_log("Error al obtener OCs asignadas: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Contar OCs asignadas pendientes por técnico
+ * @param int $tecnicoId ID del técnico
+ * @return int Cantidad de OCs pendientes
+ */
+function countOCsPendientesTecnico($tecnicoId) {
+    $pdo = getConnection();
+    
+    try {
+        $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM asignaciones_oc WHERE tecnico_id = ? AND estado IN ('pendiente', 'en_proceso')");
+        $stmt->execute([$tecnicoId]);
+        $result = $stmt->fetch();
+        return $result['total'] ?? 0;
+        
+    } catch (PDOException $e) {
+        error_log("Error al contar OCs pendientes: " . $e->getMessage());
+        return 0;
+    }
+}
+
+/**
+ * Cancelar una asignación
+ * @param int $asignacionId ID de la asignación
+ * @param string $motivo Motivo de cancelación
+ * @param int $adminId ID del admin que cancela
+ * @return bool
+ */
+function cancelarAsignacion($asignacionId, $motivo, $adminId) {
+    $pdo = getConnection();
+    
+    try {
+        $sql = "UPDATE asignaciones_oc 
+                SET estado = 'cancelada', 
+                    fecha_cancelada = NOW(), 
+                    motivo_cancelacion = ?
+                WHERE id = ? AND estado IN ('pendiente', 'en_proceso')";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$motivo, $asignacionId]);
+        
+        // Auditoría
+        logAudit(null, $adminId, 'cancelacion_asignacion',
+                "Asignación ID {$asignacionId} cancelada. Motivo: {$motivo}",
+                null);
+        
+        return true;
+        
+    } catch (PDOException $e) {
+        error_log("Error al cancelar asignación: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Marcar asignación como "en proceso" (técnico empezó a trabajar)
+ * @param int $asignacionId ID de la asignación
+ * @param int $tecnicoId ID del técnico
+ * @return bool
+ */
+function iniciarTrabajoAsignacion($asignacionId, $tecnicoId) {
+    $pdo = getConnection();
+    
+    try {
+        $sql = "UPDATE asignaciones_oc 
+                SET estado = 'en_proceso', 
+                    fecha_inicio = NOW()
+                WHERE id = ? AND tecnico_id = ? AND estado = 'pendiente'";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$asignacionId, $tecnicoId]);
+        
+        // Auditoría
+        logAudit(null, $tecnicoId, 'inicio_trabajo_asignacion',
+                "Técnico inició trabajo en asignación ID {$asignacionId}",
+                null);
+        
+        return true;
+        
+    } catch (PDOException $e) {
+        error_log("Error al iniciar trabajo: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Obtener lista de técnicos activos
+ * @return array Lista de técnicos
+ */
+function getTecnicosActivos() {
+    $pdo = getConnection();
+    
+    try {
+        $stmt = $pdo->query("SELECT id, nombre_completo, username, email FROM usuarios WHERE rol = 'user' AND estado = 'activo' ORDER BY nombre_completo ASC");
+        return $stmt->fetchAll();
+        
+    } catch (PDOException $e) {
+        error_log("Error al obtener técnicos: " . $e->getMessage());
+        return [];
+    }
 }
 ?>
 
