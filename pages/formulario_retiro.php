@@ -11,16 +11,32 @@ if (!isset($_SESSION['selected_ocs']) || empty($_SESSION['selected_ocs'])) {
     exit;
 }
 
-$currentIndex = isset($_GET['index']) ? intval($_GET['index']) : 0;
-$totalOCs = count($_SESSION['selected_ocs']);
-
-// Verificar índice válido
-if ($currentIndex < 0 || $currentIndex >= $totalOCs) {
-    header('Location: buscar_oc.php');
-    exit;
+// Determinar OC actual: por orden_servicio directo o por índice
+if (isset($_GET['orden_servicio'])) {
+    // Buscar el índice de la OC específica
+    $currentOC = $_GET['orden_servicio'];
+    $currentIndex = array_search($currentOC, $_SESSION['selected_ocs']);
+    
+    if ($currentIndex === false) {
+        // OC no está en la sesión
+        header('Location: buscar_oc.php');
+        exit;
+    }
+} else {
+    // Usar índice tradicional
+    $currentIndex = isset($_GET['index']) ? intval($_GET['index']) : 0;
+    $totalOCs = count($_SESSION['selected_ocs']);
+    
+    // Verificar índice válido
+    if ($currentIndex < 0 || $currentIndex >= $totalOCs) {
+        header('Location: buscar_oc.php');
+        exit;
+    }
+    
+    $currentOC = $_SESSION['selected_ocs'][$currentIndex];
 }
 
-$currentOC = $_SESSION['selected_ocs'][$currentIndex];
+$totalOCs = count($_SESSION['selected_ocs']);
 
 // Obtener datos de la OC actual
 try {
@@ -34,6 +50,14 @@ try {
     }
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
+}
+
+// ===== CARGAR DATOS TEMPORALES SI EXISTEN =====
+$datosTemporales = null;
+if (isset($_SESSION['ocs_temporales'][$currentOC])) {
+    $datosTemporales = $_SESSION['ocs_temporales'][$currentOC];
+    $message = "📝 <strong>Editando OC guardada temporalmente</strong>. Los cambios sobrescribirán los datos anteriores hasta que sincronices.";
+    $messageType = 'info';
 }
 
 // ===== VALIDACIÓN ANTI-DUPLICACIÓN =====
@@ -73,6 +97,9 @@ $currentUser = getCurrentUser();
 // Procesar formulario
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        // ========== GUARDADO TEMPORAL EN SESIÓN ==========
+        // Las fotos se guardan al servidor pero el registro espera en sesión
+        
         $pdo = getConnection();
 
         // Debug: mostrar datos recibidos
@@ -118,12 +145,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             $extension = $extensionMap[$mimeType] ?? 'jpg';
             
-            // Formato: OC-xxx_NumSuministro_NumSerie_FechaHora.extension
+            // Formato: OC-xxx_NumSuministro_FechaHora.extension
             $numSuministro = !empty($orden['num_suministro']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $orden['num_suministro']) : 'SIN_SUMINISTRO';
-            $numSerie = !empty($orden['num_serie_medidor']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $orden['num_serie_medidor']) : 'SIN_SERIE';
             $fechaHora = date('Ymd_His'); // Formato: 20251025_143022
             
-            $fileName = $currentOC . '_' . $numSuministro . '_' . $numSerie . '_' . $fechaHora . '.' . $extension;
+            $fileName = $currentOC . '_' . $numSuministro . '_' . $fechaHora . '.' . $extension;
             $fotoPath = $uploadDir . $fileName;
             
             if (!move_uploaded_file($_FILES['foto_imposibilidad']['tmp_name'], $fotoPath)) {
@@ -169,179 +195,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Determinar si tiene foto
         $tiene_foto = (!empty($fotoPath)) ? 'SI' : 'NO';
 
-        // Verificar si la columna tiene_foto existe (para compatibilidad)
-        $checkColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'tiene_foto'";
-        $columnExists = $pdo->query($checkColumnQuery)->rowCount() > 0;
-
         // Obtener técnico del campo oculto
         $tecnicoResponsable = isset($_POST['tecnico_hidden']) ? $_POST['tecnico_hidden'] :
                               (isset($_POST['tecnico']) ? $_POST['tecnico'] : null);
 
-        if ($columnExists) {
-            // Con la nueva estructura (incluyendo usuario_id y tipos de imposibilidad)
-            $sql = "INSERT INTO retiros_medidores (
-                orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
-                puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
-                medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
-                info_caja_medidor, observacion, foto_imposibilidad, tiene_foto,
-                tecnico_responsable, usuario_id, tipo_imposibilidad_id, detalles_imposibilidad
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-            $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            $orden['id'],
-            $currentOC,
-            $medidor_retirado,
-            $lectura_m3,
-            $puntero_girando,
-            $medidor_con_precinto,
-            $visor_imposibilidad,
-            $medidor_tiene_filtro,
-            $filtro_buen_estado,
-            $solidos_retenidos,
-            $info_caja,
-            $_POST['observacion'],
-            $fotoPath,
-            $tiene_foto,
-            $tecnicoResponsable,
-            $_SESSION['user_id'],
-            $tipo_imposibilidad_id,
-            $detalles_imposibilidad
-        ]);
-
-        // Obtener ID del registro insertado
-        $registroId = $pdo->lastInsertId();
-
-        // Marcar evidencia como obligatoria si corresponde y establecer fecha límite
-        if ($tipo_imposibilidad_id) {
-            marcarEvidenciaObligatoria($registroId, $tipo_imposibilidad_id);
+        // ========== GUARDAR EN SESIÓN TEMPORAL ==========
+        // Inicializar array si no existe
+        if (!isset($_SESSION['ocs_temporales'])) {
+            $_SESSION['ocs_temporales'] = [];
         }
-
-        // Registrar en auditoría
-        $tipoInfo = $tipo_imposibilidad_id ? getTipoImposibilidad($tipo_imposibilidad_id) : null;
-        $tipoDescripcion = $tipoInfo ? $tipoInfo['descripcion'] : 'Sin especificar';
-        logAudit($registroId, $_SESSION['user_id'], 'registro_oc',
-                "Registro exitoso de OC: $currentOC - Retirado: $medidor_retirado - Tipo: $tipoDescripcion",
-                $currentOC);
-
-        error_log("Registro guardado exitosamente. ID: " . $registroId);
-        } else {
-            // Verificar si existe la columna usuario_id para agregarla
-            $checkUserColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'usuario_id'";
-            $userColumnExists = $pdo->query($checkUserColumnQuery)->rowCount() > 0;
-
-            if ($userColumnExists) {
-                // Verificar si existe la columna tipo_imposibilidad_id
-                $checkImposibilidadColumnQuery = "SHOW COLUMNS FROM retiros_medidores LIKE 'tipo_imposibilidad_id'";
-                $imposibilidadColumnExists = $pdo->query($checkImposibilidadColumnQuery)->rowCount() > 0;
-
-                if ($imposibilidadColumnExists) {
-                    // Con usuario_id y tipos de imposibilidad
-                    $sql = "INSERT INTO retiros_medidores (
-                        orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
-                        puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
-                        medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
-                        info_caja_medidor, observacion, foto_imposibilidad,
-                        tecnico_responsable, usuario_id, tipo_imposibilidad_id, detalles_imposibilidad
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([
-                        $orden['id'],
-                        $currentOC,
-                        $medidor_retirado,
-                        $lectura_m3,
-                        $puntero_girando,
-                        $medidor_con_precinto,
-                        $visor_imposibilidad,
-                        $medidor_tiene_filtro,
-                        $filtro_buen_estado,
-                        $solidos_retenidos,
-                        $info_caja,
-                        $_POST['observacion'],
-                        $fotoPath,
-                        $tecnicoResponsable,
-                        $_SESSION['user_id'],
-                        $tipo_imposibilidad_id,
-                        $detalles_imposibilidad
-                    ]);
-                } else {
-                    // Con usuario_id pero sin tipos de imposibilidad
-                    $sql = "INSERT INTO retiros_medidores (
-                        orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
-                        puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
-                        medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
-                        info_caja_medidor, observacion, foto_imposibilidad,
-                        tecnico_responsable, usuario_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([
-                        $orden['id'],
-                        $currentOC,
-                        $medidor_retirado,
-                        $lectura_m3,
-                        $puntero_girando,
-                        $medidor_con_precinto,
-                        $visor_imposibilidad,
-                        $medidor_tiene_filtro,
-                        $filtro_buen_estado,
-                        $solidos_retenidos,
-                        $info_caja,
-                        $_POST['observacion'],
-                        $fotoPath,
-                        $tecnicoResponsable,
-                        $_SESSION['user_id']
-                    ]);
-                }
-            } else {
-                // Estructura anterior completa (sin usuario_id ni tipos de imposibilidad)
-                $sql = "INSERT INTO retiros_medidores (
-                    orden_servicio_id, orden_servicio, medidor_retirado, lectura_m3,
-                    puntero_girando, medidor_con_precinto, visor_imposibilidad_lectura,
-                    medidor_tiene_filtro, filtro_buen_estado, solidos_retenidos_filtro,
-                    info_caja_medidor, observacion, foto_imposibilidad, tecnico_responsable
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $orden['id'],
-                    $currentOC,
-                    $medidor_retirado,
-                    $lectura_m3,
-                    $puntero_girando,
-                    $medidor_con_precinto,
-                    $visor_imposibilidad,
-                    $medidor_tiene_filtro,
-                    $filtro_buen_estado,
-                    $solidos_retenidos,
-                    $info_caja,
-                    $_POST['observacion'],
-                    $fotoPath,
-                    $tecnicoResponsable
-                ]);
-            }
-
-            // Obtener ID del registro insertado
-            $registroId = $pdo->lastInsertId();
-
-            // Registrar en auditoría
-            $tipoInfo = $tipo_imposibilidad_id ? getTipoImposibilidad($tipo_imposibilidad_id) : null;
-            $tipoDescripcion = $tipoInfo ? $tipoInfo['descripcion'] : 'Sin especificar';
-            logAudit($registroId, $_SESSION['user_id'], 'registro_oc',
-                    "Registro exitoso de OC: $currentOC - Retirado: $medidor_retirado - Tipo: $tipoDescripcion",
-                    $currentOC);
-
-            error_log("Registro guardado exitosamente (estructura anterior). ID: " . $registroId);
-        }
-
-        // Redirigir al siguiente formulario o a la página de finalización
-        $nextIndex = $currentIndex + 1;
-        if ($nextIndex < $totalOCs) {
-            header("Location: formulario_retiro.php?index=$nextIndex");
-        } else {
-            header("Location: finalizar.php");
-        }
+        
+        // Guardar datos en sesión
+        $_SESSION['ocs_temporales'][$currentOC] = [
+            'orden_servicio' => $currentOC,
+            'num_suministro' => $orden['num_suministro'],
+            'num_serie_medidor' => $orden['num_serie_medidor'],
+            'direccion' => $orden['direccion'],
+            'tipo_medidor' => null,
+            'marca_medidor' => null,
+            'modelo_medidor' => null,
+            'material_medidor' => null,
+            'diametro_medidor' => null,
+            'serie_regulador' => null,
+            'marca_regulador' => null,
+            'modelo_regulador' => null,
+            'tipo_regulador' => null,
+            'material_regulador' => null,
+            'serie_valvula' => null,
+            'marca_valvula' => null,
+            'tipo_valvula' => null,
+            'material_valvula' => null,
+            'lectura_retiro' => $lectura_m3,
+            'estado_medidor' => $puntero_girando,
+            'condicion_medidor' => $medidor_con_precinto,
+            'observaciones' => $_POST['observacion'],
+            'foto_medidor_retirado' => $fotoPath,
+            'foto_conexion' => null,
+            'foto_entorno' => null,
+            'tecnico_responsable' => $tecnicoResponsable,
+            // Datos adicionales para referencia
+            'medidor_retirado' => $medidor_retirado,
+            'puntero_girando' => $puntero_girando,
+            'medidor_con_precinto' => $medidor_con_precinto,
+            'visor_imposibilidad' => $visor_imposibilidad ?? null,
+            'medidor_tiene_filtro' => $medidor_tiene_filtro,
+            'filtro_buen_estado' => $filtro_buen_estado,
+            'solidos_retenidos' => $solidos_retenidos,
+            'info_caja' => $info_caja,
+            'tiene_foto' => $tiene_foto,
+            'tipo_imposibilidad_id' => $tipo_imposibilidad_id,
+            'detalles_imposibilidad' => $detalles_imposibilidad,
+            'orden_id' => $orden['id']
+        ];
+        
+        error_log("Datos guardados temporalmente en sesión para OC: $currentOC");
+        
+        // Redirigir a vista previa con mensaje de guardado temporal
+        header("Location: vista_previa.php?temporal=1&oc=" . urlencode($currentOC));
         exit;
         
     } catch (Exception $e) {
@@ -856,31 +766,22 @@ require_once '../includes/header.php';
                     <!-- Botones de navegación -->
                     <div class="row g-2 g-md-3">
                         <div class="col-12 col-md-4">
-                            <?php if ($currentIndex > 0): ?>
-                                <a href="?index=<?= $currentIndex - 1 ?>" class="btn btn-outline-secondary w-100">
-                                    <i class="bi bi-arrow-left-circle"></i>
-                                    <span class="d-none d-sm-inline">OC Anterior</span>
-                                    <span class="d-sm-none">Anterior</span>
-                                </a>
-                            <?php else: ?>
-                                <a href="vista_previa.php" class="btn btn-outline-secondary w-100">
-                                    <i class="bi bi-arrow-left-circle"></i>
-                                    <span class="d-none d-sm-inline">Vista Previa</span>
-                                    <span class="d-sm-none">Volver</span>
-                                </a>
-                            <?php endif; ?>
+                            <a href="vista_previa.php" class="btn btn-outline-secondary w-100">
+                                <i class="bi bi-arrow-left-circle"></i>
+                                <span class="d-none d-sm-inline">Regresar a Lista</span>
+                                <span class="d-sm-none">Volver</span>
+                            </a>
                         </div>
                         <div class="col-12 col-md-8">
-                            <button type="submit" class="btn btn-success w-100 btn-lg btn-submit shadow">
-                                <?php if ($currentIndex < $totalOCs - 1): ?>
-                                    <i class="bi bi-save me-2"></i>
-                                    Guardar y Continuar
-                                    <i class="bi bi-arrow-right-circle ms-2"></i>
-                                <?php else: ?>
-                                    <i class="bi bi-check-circle-fill me-2"></i>
-                                    Guardar y Finalizar
-                                <?php endif; ?>
+                            <button type="submit" class="btn btn-warning w-100 btn-lg btn-submit shadow">
+                                <i class="bi bi-save me-2"></i>
+                                Guardar Temporalmente (Sin Sincronizar)
+                                <i class="bi bi-hourglass-split ms-2"></i>
                             </button>
+                            <small class="text-muted d-block mt-2 text-center">
+                                <i class="bi bi-info-circle"></i>
+                                Los datos se guardarán en sesión. Deberás sincronizarlos desde la vista previa.
+                            </small>
                         </div>
                     </div>
 
