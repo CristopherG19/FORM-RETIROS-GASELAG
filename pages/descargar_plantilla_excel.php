@@ -18,6 +18,16 @@ header('Cache-Control: max-age=0');
 // BOM para UTF-8 (importante para Excel)
 echo "\xEF\xBB\xBF";
 
+// Escribir instrucciones (comentario en CSV)
+echo "# INSTRUCCIONES:\n";
+echo "# - Formato de fechas: DD/MM/YYYY o D/M/YYYY (ejemplo: 13/12/2024 o 6/01/2025)\n";
+echo "# - Formato de horas: HH.MM con punto decimal (ejemplo: 10.3 = 10:30, 8.15 = 08:15)\n";
+echo "# - Separador: punto y coma (;)\n";
+echo "# - Codificación: UTF-8\n";
+echo "# - NO BORRAR la fila de encabezados\n";
+echo "# - La segunda fila contiene un ejemplo de referencia\n";
+echo "#\n";
+
 // Encabezados de columnas
 $headers = [
     'Item', 'Orden de servicio', 'Fecha OS', 'Cantidad de medidores', 'Tipo de Servicio',
@@ -40,10 +50,10 @@ function escapeCsv($value) {
 // Escribir encabezados
 echo implode(';', array_map('escapeCsv', $headers)) . "\n";
 
-// Escribir fila de ejemplo
+// Escribir fila de ejemplo (Fechas: D/M/YYYY, Horas: HH.MM con punto)
 $exampleData = [
-    '00001', 'OC-00001', '2024-12-13', '1', 'Reclamo',
-    '2025-01-06', '08:00', '2025-01-07', '10:00', 'ABC123',
+    '00001', 'OC-00001', '13/12/2024', '1', 'Reclamo',
+    '6/01/2025', '10.3', '7/01/2025', '10.3', 'ABC123',
     'Cliente Ejemplo', 'Centro 001', 'REM001', 'Juan Pérez',
     'Calle Principal 123', 'CUS001', 'CUP001', '5367165',
     'EA22282911', 'Marca Ejemplo', 'Modelo 001', '2023',

@@ -4,6 +4,46 @@ require_once '../config/database.php';
 // Solo administradores
 requireRole(['admin']);
 
+// ============================================
+// PROCESAR ASIGNACIÓN MASIVA ANTES DE GENERAR HTML
+// ============================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['asignar_masivo'])) {
+    $ocsSeleccionadas = $_POST['ocs_seleccionadas'] ?? [];
+    $tecnicoId = intval($_POST['tecnico_id']);
+    $notas = trim($_POST['notas_admin'] ?? '');
+    
+    if (empty($ocsSeleccionadas)) {
+        header('Location: asignar_oc_masivo.php?error=sin_ocs');
+        exit;
+    } elseif ($tecnicoId <= 0) {
+        header('Location: asignar_oc_masivo.php?error=sin_tecnico');
+        exit;
+    } else {
+        $resultado = asignarOCsMasivamente($ocsSeleccionadas, $tecnicoId, $_SESSION['user_id'], $notas);
+        
+        if ($resultado['success']) {
+            $exitosas = $resultado['exitosas'];
+            $fallidas = $resultado['fallidas'];
+            
+            if ($fallidas > 0) {
+                // Asignación parcial
+                header("Location: asignar_oc_masivo.php?success=parcial&exitosas={$exitosas}&fallidas={$fallidas}");
+            } else {
+                // Asignación completa
+                header("Location: asignar_oc_masivo.php?success=completa&total={$exitosas}");
+            }
+            exit;
+        } else {
+            // Error en la asignación
+            header('Location: asignar_oc_masivo.php?error=asignacion_fallida');
+            exit;
+        }
+    }
+}
+
+// ============================================
+// AHORA SÍ GENERAR HTML
+// ============================================
 $pageTitle = 'Asignación Masiva de OCs - Sistema GASELAG';
 require_once '../includes/header.php';
 
@@ -26,34 +66,33 @@ try {
     die("Error al obtener OCs pendientes: " . $e->getMessage());
 }
 
+// Mensajes basados en parámetros GET
 $message = '';
 $messageType = '';
 
-// Procesar asignación masiva
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['asignar_masivo'])) {
-    $ocsSeleccionadas = $_POST['ocs_seleccionadas'] ?? [];
-    $tecnicoId = intval($_POST['tecnico_id']);
-    $notas = trim($_POST['notas_admin'] ?? '');
-    
-    if (empty($ocsSeleccionadas)) {
-        $message = 'Debe seleccionar al menos una OC';
+if (isset($_GET['success'])) {
+    if ($_GET['success'] === 'completa') {
+        $total = intval($_GET['total'] ?? 0);
+        $message = "✅ Asignación masiva completada: {$total} OCs asignadas exitosamente";
+        $messageType = 'success';
+    } elseif ($_GET['success'] === 'parcial') {
+        $exitosas = intval($_GET['exitosas'] ?? 0);
+        $fallidas = intval($_GET['fallidas'] ?? 0);
+        $message = "⚠️ Asignación masiva completada: {$exitosas} OCs asignadas exitosamente. {$fallidas} OCs no pudieron ser asignadas";
+        $messageType = 'warning';
+    }
+}
+
+if (isset($_GET['error'])) {
+    if ($_GET['error'] === 'sin_ocs') {
+        $message = '❌ Debe seleccionar al menos una OC';
         $messageType = 'danger';
-    } elseif ($tecnicoId <= 0) {
-        $message = 'Debe seleccionar un técnico';
+    } elseif ($_GET['error'] === 'sin_tecnico') {
+        $message = '❌ Debe seleccionar un técnico';
         $messageType = 'danger';
-    } else {
-        $resultado = asignarOCsMasivamente($ocsSeleccionadas, $tecnicoId, $_SESSION['user_id'], $notas);
-        
-        if ($resultado['success']) {
-            $message = "✅ Asignación masiva completada: {$resultado['exitosas']} OCs asignadas exitosamente";
-            if ($resultado['fallidas'] > 0) {
-                $message .= ". {$resultado['fallidas']} OCs no pudieron ser asignadas";
-            }
-            $messageType = $resultado['fallidas'] > 0 ? 'warning' : 'success';
-        } else {
-            $message = 'Error en la asignación masiva';
-            $messageType = 'danger';
-        }
+    } elseif ($_GET['error'] === 'asignacion_fallida') {
+        $message = '❌ Error en la asignación masiva';
+        $messageType = 'danger';
     }
 }
 ?>

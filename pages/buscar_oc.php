@@ -5,14 +5,47 @@ require_once '../config/AppConfig.php';
 // Verificar autenticación (todos los usuarios)
 requireRole(['admin', 'user']);
 
+// Inicializar variables
+$message = '';
+$messageType = '';
+$ocData = null;
+
 // Inicializar array de OCs seleccionadas si no existe
 if (!isset($_SESSION['selected_ocs'])) {
     $_SESSION['selected_ocs'] = [];
 }
 
-$message = '';
-$messageType = '';
-$ocData = null;
+// Auto-limpiar OCs que ya están registradas en BD
+if (!empty($_SESSION['selected_ocs'])) {
+    $pdo_temp = getConnection();
+    $ocsLimpiadas = [];
+    
+    foreach ($_SESSION['selected_ocs'] as $key => $oc) {
+        $stmt_check = $pdo_temp->prepare("SELECT id FROM retiros_medidores WHERE orden_servicio = ?");
+        $stmt_check->execute([$oc]);
+        
+        if ($stmt_check->fetch()) {
+            // Ya está en BD, eliminar de la sesión
+            unset($_SESSION['selected_ocs'][$key]);
+            $ocsLimpiadas[] = $oc;
+        }
+    }
+    
+    // Reindexar array
+    $_SESSION['selected_ocs'] = array_values($_SESSION['selected_ocs']);
+    
+    // Si se limpiaron OCs, mostrar mensaje
+    if (!empty($ocsLimpiadas) && !isset($_GET['limpiado'])) {
+        $message = 'ℹ️ <strong>' . count($ocsLimpiadas) . ' OC(s) ya registrada(s) fueron removidas automáticamente de la sesión:</strong> ' . implode(', ', $ocsLimpiadas);
+        $messageType = 'info';
+    }
+}
+
+// Mensaje de sesión limpiada
+if (isset($_GET['limpiado']) && $_GET['limpiado'] == 1) {
+    $message = '✅ <strong>Sesión limpiada exitosamente.</strong> Puedes buscar y agregar nuevas OCs.';
+    $messageType = 'success';
+}
 
 // ===== MANEJO DE OCs ASIGNADAS =====
 // Si viene desde "Mis OCs Asignadas", agregar automáticamente y redirigir

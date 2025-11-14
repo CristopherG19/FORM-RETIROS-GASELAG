@@ -11,7 +11,7 @@
                         <i class="bi bi-speedometer2 me-2"></i>GASELAG
                     </h5>
                     <p class="text-white-50 small">
-                        Sistema de Gestión de Retiro de Medidores de Gas Natural
+                        Sistema de Gestión de Retiro de Medidores de Agua Potable
                     </p>
                     <p class="text-white-50 small mb-0">
                         <i class="bi bi-geo-alt me-2"></i>San Luis, Lima

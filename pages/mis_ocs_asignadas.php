@@ -1,29 +1,53 @@
 <?php
+// Habilitar visualización de errores para depuración
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+
 require_once '../config/database.php';
 
 // Solo técnicos pueden acceder
 requireRole(['user']);
 
+// ============================================
+// PROCESAR ACCIONES ANTES DE GENERAR HTML
+// ============================================
+$tecnicoId = $_SESSION['user_id'];
+
+// Procesar inicio de trabajo (ANTES de incluir header.php)
+if (isset($_GET['iniciar']) && isset($_GET['id'])) {
+    $asignacionId = intval($_GET['id']);
+    
+    try {
+        if (iniciarTrabajoAsignacion($asignacionId, $tecnicoId)) {
+            header('Location: mis_ocs_asignadas.php?success=iniciado');
+            exit;
+        } else {
+            // Si la función retorna false
+            header('Location: mis_ocs_asignadas.php?error=no_actualizado');
+            exit;
+        }
+    } catch (Exception $e) {
+        // Si hay un error de excepción
+        error_log("Error al iniciar trabajo: " . $e->getMessage());
+        header('Location: mis_ocs_asignadas.php?error=excepcion&msg=' . urlencode($e->getMessage()));
+        exit;
+    }
+}
+
+// ============================================
+// AHORA SÍ INCLUIR EL HEADER Y GENERAR HTML
+// ============================================
 $pageTitle = 'Mis OCs Asignadas - Sistema GASELAG';
 require_once '../includes/header.php';
 
 // Obtener OCs asignadas al técnico actual
-$tecnicoId = $_SESSION['user_id'];
 $ocsAsignadas = getOCsAsignadasTecnico($tecnicoId, 'todas');
 
 // Separar por estado
 $pendientes = array_filter($ocsAsignadas, fn($oc) => $oc['estado'] === 'pendiente');
 $enProceso = array_filter($ocsAsignadas, fn($oc) => $oc['estado'] === 'en_proceso');
 $completadas = array_filter($ocsAsignadas, fn($oc) => $oc['estado'] === 'completada');
-
-// Procesar inicio de trabajo
-if (isset($_GET['iniciar']) && isset($_GET['id'])) {
-    $asignacionId = intval($_GET['id']);
-    if (iniciarTrabajoAsignacion($asignacionId, $tecnicoId)) {
-        header('Location: mis_ocs_asignadas.php?success=iniciado');
-        exit;
-    }
-}
 
 $message = '';
 $messageType = '';
@@ -32,6 +56,16 @@ if (isset($_GET['success'])) {
     if ($_GET['success'] === 'iniciado') {
         $message = 'OC marcada como "En Proceso". ¡Puedes comenzar a trabajar!';
         $messageType = 'success';
+    }
+}
+
+if (isset($_GET['error'])) {
+    if ($_GET['error'] === 'no_actualizado') {
+        $message = '⚠️ No se pudo actualizar el estado de la OC. Puede que ya esté en proceso o completada.';
+        $messageType = 'warning';
+    } elseif ($_GET['error'] === 'excepcion') {
+        $message = '❌ Error: ' . htmlspecialchars($_GET['msg'] ?? 'Error desconocido');
+        $messageType = 'danger';
     }
 }
 ?>
