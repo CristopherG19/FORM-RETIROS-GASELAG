@@ -1,8 +1,8 @@
 <?php
 require_once '../config/database.php';
 
-// Verificar autenticación (todos los usuarios)
-requireRole(['admin', 'user']);
+// SOLO administradores pueden acceder a esta página
+requireRole(['admin']);
 
 // Filtros
 $filtro_oc = isset($_GET['filtro_oc']) ? trim($_GET['filtro_oc']) : '';
@@ -10,6 +10,9 @@ $filtro_cliente = isset($_GET['filtro_cliente']) ? trim($_GET['filtro_cliente'])
 $filtro_estado = isset($_GET['filtro_estado']) ? $_GET['filtro_estado'] : '';
 $filtro_fecha_desde = isset($_GET['filtro_fecha_desde']) ? $_GET['filtro_fecha_desde'] : '';
 $filtro_fecha_hasta = isset($_GET['filtro_fecha_hasta']) ? $_GET['filtro_fecha_hasta'] : '';
+
+// Filtro especial para OCs recién importadas (por created_at)
+$fecha_desde_importacion = isset($_GET['fecha_desde']) ? $_GET['fecha_desde'] : '';
 
 // Paginación
 $itemsPorPagina = 20;
@@ -73,6 +76,12 @@ try {
         $params[] = $filtro_fecha_hasta;
     }
 
+    // Filtro especial: OCs importadas desde una fecha específica (created_at)
+    if (!empty($fecha_desde_importacion)) {
+        $sqlCount .= " AND DATE(o.created_at) >= ?";
+        $params[] = $fecha_desde_importacion;
+    }
+
     // Obtener total de registros
     $stmtCount = $pdo->prepare($sqlCount);
     $stmtCount->execute($params);
@@ -80,19 +89,26 @@ try {
     $totalPaginas = ceil($totalRegistros / $itemsPorPagina);
 
     // Consultar todas las OC y verificar si tienen retiro registrado (con paginación)
+    // CAMBIO: Incluir TODAS las asignaciones (pendiente, en_proceso, completada) para mantener trazabilidad
     $sql = "SELECT 
                 o.*,
                 CASE 
                     WHEN r.id IS NOT NULL THEN 'Registrado'
                     ELSE 'Pendiente'
                 END as estado_registro,
-                u.nombre_completo as tecnico_asignado,
+                u.nombre_completo as tecnico_registro,
                 r.medidor_retirado,
                 r.fecha_registro as fecha_retiro,
-                TIMESTAMPDIFF(DAY, o.programacion_dia_retiro, CURDATE()) as dias_vencido
+                TIMESTAMPDIFF(DAY, o.programacion_dia_retiro, CURDATE()) as dias_vencido,
+                a.id as asignacion_id,
+                a.estado as estado_asignacion,
+                a.tecnico_nombre as tecnico_asignado,
+                a.fecha_asignacion,
+                a.fecha_completada
             FROM ordenes_servicio o
             LEFT JOIN retiros_medidores r ON o.id = r.orden_servicio_id AND r.estado_registro = 'activo'
             LEFT JOIN usuarios u ON r.usuario_id = u.id
+            LEFT JOIN asignaciones_oc a ON o.orden_servicio = a.orden_servicio AND a.estado IN ('pendiente', 'en_proceso', 'completada')
             WHERE 1=1";
 
     // Aplicar los mismos filtros
@@ -118,6 +134,11 @@ try {
 
     if (!empty($filtro_fecha_hasta)) {
         $sql .= " AND o.programacion_dia_retiro <= ?";
+    }
+
+    // Filtro especial: OCs importadas desde una fecha específica (created_at)
+    if (!empty($fecha_desde_importacion)) {
+        $sql .= " AND DATE(o.created_at) >= ?";
     }
 
     $sql .= " ORDER BY o.programacion_dia_retiro DESC, o.created_at DESC LIMIT ? OFFSET ?";
@@ -192,6 +213,31 @@ require_once '../includes/header.php';
                 <i class="bi bi-<?= $tipo_mensaje_asignacion === 'success' ? 'check-circle' : 'exclamation-triangle' ?>"></i>
                 <?= htmlspecialchars($mensaje_asignacion) ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
+        <!-- Banner de OCs recién importadas -->
+        <?php if (!empty($fecha_desde_importacion)): ?>
+            <div class="alert alert-info alert-dismissible fade show border-start border-primary border-4">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-cloud-check-fill fs-2 me-3 text-primary"></i>
+                    <div class="flex-grow-1">
+                        <h5 class="alert-heading mb-1">
+                            <i class="bi bi-filter-circle"></i> Mostrando OCs Recién Importadas
+                        </h5>
+                        <p class="mb-1">
+                            Estas son las órdenes de servicio importadas desde: <strong><?= date('d/m/Y', strtotime($fecha_desde_importacion)) ?></strong>
+                        </p>
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            Total de registros: <strong><?= $totalRegistros ?></strong>
+                        </small>
+                    </div>
+                    <a href="listar_oc.php" class="btn btn-sm btn-outline-primary ms-3">
+                        <i class="bi bi-x-circle"></i> Ver Todas las OCs
+                    </a>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         <?php endif; ?>
 
@@ -338,6 +384,7 @@ require_once '../includes/header.php';
                                     <th>N° Serie Medidor</th>
                                     <th>Dirección</th>
                                     <th>Estado</th>
+                                    <th>Asignado a</th>
                                     <th>Técnico</th>
                                     <th>Medidor</th>
                                     <th>Acciones</th>
@@ -388,9 +435,38 @@ require_once '../includes/header.php';
                                                 </span>
                                             <?php endif; ?>
                                         </td>
+                                        <!-- Columna: Asignado a (muestra asignación con trazabilidad completa) -->
                                         <td>
-                                            <?php if (!empty($oc['tecnico_asignado'])): ?>
-                                                <small><?= htmlspecialchars($oc['tecnico_asignado']) ?></small>
+                                            <?php if (!empty($oc['tecnico_asignado']) && !empty($oc['estado_asignacion'])): ?>
+                                                <div>
+                                                    <small><strong><?= htmlspecialchars($oc['tecnico_asignado']) ?></strong></small>
+                                                    <br>
+                                                    <?php if ($oc['estado_asignacion'] === 'pendiente'): ?>
+                                                        <span class="badge bg-warning text-dark" style="font-size: 0.7rem;">
+                                                            <i class="bi bi-clock"></i> Pendiente
+                                                        </span>
+                                                    <?php elseif ($oc['estado_asignacion'] === 'en_proceso'): ?>
+                                                        <span class="badge bg-info" style="font-size: 0.7rem;">
+                                                            <i class="bi bi-hourglass-split"></i> En Proceso
+                                                        </span>
+                                                    <?php elseif ($oc['estado_asignacion'] === 'completada'): ?>
+                                                        <span class="badge bg-success" style="font-size: 0.7rem;">
+                                                            <i class="bi bi-check-circle-fill"></i> Completada
+                                                        </span>
+                                                    <?php elseif ($oc['estado_asignacion'] === 'cancelada'): ?>
+                                                        <span class="badge bg-secondary" style="font-size: 0.7rem;">
+                                                            <i class="bi bi-x-circle"></i> Cancelada
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php else: ?>
+                                                <span class="text-muted">Sin asignar</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <!-- Columna: Técnico (muestra quien REGISTRÓ el retiro) -->
+                                        <td>
+                                            <?php if (!empty($oc['tecnico_registro'])): ?>
+                                                <small><?= htmlspecialchars($oc['tecnico_registro']) ?></small>
                                             <?php else: ?>
                                                 <span class="text-muted">-</span>
                                             <?php endif; ?>

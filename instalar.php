@@ -103,8 +103,17 @@
                 <p>Este asistente configurará automáticamente:</p>
                 <ul>
                     <li>✅ Base de datos <code>gaselag_retiros</code></li>
-                    <li>✅ Tablas necesarias (ordenes_servicio, retiros_medidores, sesiones_oc)</li>
+                    <li>✅ <strong>11 tablas principales:</strong>
+                        <ul>
+                            <li>Usuarios y autenticación</li>
+                            <li>Órdenes de servicio</li>
+                            <li>Retiros de medidores</li>
+                            <li>Sistema de asignaciones (OCs a técnicos)</li>
+                            <li>Auditoría y seguridad</li>
+                        </ul>
+                    </li>
                     <li>✅ Datos de ejemplo (opcional)</li>
+                    <li>✅ Usuarios predeterminados (admin + técnicos)</li>
                 </ul>
                 <p><strong>Configuración actual:</strong></p>
                 <ul>
@@ -190,7 +199,7 @@
             <?php
         } elseif ($paso == 2) {
             ?>
-            <h2>🗄️ Paso 2: Creación de Base de Datos</h2>
+            <h2>🗄️ Paso 2: Creación de Base de Datos y Migraciones</h2>
             
             <?php
             try {
@@ -229,56 +238,100 @@
                 // Usar la base de datos
                 $pdo->exec("USE gaselag_retiros");
                 
-                // Leer y ejecutar schema.sql
-                echo '<div class="step info">';
-                echo '<span class="icon">⏳</span>';
-                echo 'Creando tablas y datos iniciales...';
-                echo '</div>';
+                // Lista de archivos SQL a ejecutar en orden
+                $archivos_sql = [
+                    'database/schema.sql' => 'Esquema principal (tablas básicas)',
+                    'database/migration_usuarios_perfil.sql' => 'Perfiles de usuario',
+                    'database/migration_asignaciones_oc.sql' => 'Sistema de asignaciones'
+                ];
                 
-                $sql = file_get_contents('database/schema.sql');
-                
-                // Dividir por punto y coma y ejecutar cada statement
-                $statements = array_filter(array_map('trim', explode(';', $sql)));
                 $tablas_creadas = [];
                 $datos_insertados = 0;
+                $migraciones_ejecutadas = 0;
                 
-                foreach ($statements as $statement) {
-                    if (!empty($statement) && stripos($statement, 'CREATE DATABASE') === false && stripos($statement, 'USE ') === false) {
-                        try {
-                            $pdo->exec($statement);
+                // Ejecutar cada archivo SQL
+                foreach ($archivos_sql as $archivo => $descripcion) {
+                    if (!file_exists($archivo)) {
+                        echo '<div class="step error">';
+                        echo '<span class="icon">⚠️</span>';
+                        echo "<strong>Advertencia:</strong> {$archivo} no encontrado (omitiendo)";
+                        echo '</div>';
+                        continue;
+                    }
+                    
+                    echo '<div class="step info">';
+                    echo '<span class="icon">⏳</span>';
+                    echo "Ejecutando: <strong>{$descripcion}</strong><br>";
+                    echo "<small><code>{$archivo}</code></small>";
+                    echo '</div>';
+                    
+                    $sql = file_get_contents($archivo);
+                    
+                    // Dividir por punto y coma y ejecutar cada statement
+                    $statements = array_filter(array_map('trim', explode(';', $sql)));
+                    
+                    foreach ($statements as $statement) {
+                        if (!empty($statement) && 
+                            stripos($statement, 'CREATE DATABASE') === false && 
+                            stripos($statement, 'USE ') === false &&
+                            stripos($statement, 'DELIMITER') === false &&
+                            stripos($statement, 'SHOW ') === false &&
+                            stripos($statement, 'DESCRIBE ') === false) {
                             
-                            // Contar tablas creadas
-                            if (stripos($statement, 'CREATE TABLE') !== false) {
-                                preg_match('/CREATE TABLE.*?`?(\w+)`?/i', $statement, $matches);
-                                if (isset($matches[1])) {
-                                    $tablas_creadas[] = $matches[1];
+                            try {
+                                $pdo->exec($statement);
+                                
+                                // Contar tablas creadas
+                                if (stripos($statement, 'CREATE TABLE') !== false) {
+                                    preg_match('/CREATE TABLE.*?`?(\w+)`?/i', $statement, $matches);
+                                    if (isset($matches[1])) {
+                                        $tablas_creadas[] = $matches[1];
+                                    }
                                 }
-                            }
-                            
-                            // Contar datos insertados
-                            if (stripos($statement, 'INSERT') !== false) {
-                                $datos_insertados++;
-                            }
-                            
-                        } catch (PDOException $e) {
-                            // Si es un error de duplicado, lo ignoramos
-                            if (strpos($e->getMessage(), 'Duplicate entry') === false && 
-                                strpos($e->getMessage(), 'already exists') === false) {
-                                throw $e; // Re-lanzar si no es un error de duplicado
+                                
+                                // Contar datos insertados
+                                if (stripos($statement, 'INSERT') !== false) {
+                                    $datos_insertados++;
+                                }
+                                
+                            } catch (PDOException $e) {
+                                // Ignorar errores comunes de migración
+                                if (strpos($e->getMessage(), 'Duplicate entry') === false && 
+                                    strpos($e->getMessage(), 'already exists') === false &&
+                                    strpos($e->getMessage(), 'Duplicate column') === false &&
+                                    strpos($e->getMessage(), 'Duplicate key') === false &&
+                                    strpos($e->getMessage(), "Can't DROP") === false) {
+                                    // Solo mostrar errores críticos
+                                    echo '<div class="step error">';
+                                    echo '<span class="icon">⚠️</span>';
+                                    echo '<small>' . htmlspecialchars($e->getMessage()) . '</small>';
+                                    echo '</div>';
+                                }
                             }
                         }
                     }
+                    
+                    $migraciones_ejecutadas++;
+                    
+                    echo '<div class="step success">';
+                    echo '<span class="icon">✅</span>';
+                    echo "<strong>{$descripcion}</strong> ejecutado correctamente";
+                    echo '</div>';
                 }
                 
                 echo '<div class="step success">';
                 echo '<span class="icon">✅</span>';
                 echo '<strong>Base de datos instalada exitosamente</strong>';
                 echo '<ul>';
-                foreach ($tablas_creadas as $tabla) {
-                    echo '<li>✓ ' . $tabla . '</li>';
-                }
-                echo '<li>✓ ' . $datos_insertados . ' conjuntos de datos iniciales</li>';
+                echo '<li>📦 <strong>' . $migraciones_ejecutadas . '</strong> migraciones ejecutadas</li>';
+                echo '<li>📋 <strong>' . count($tablas_creadas) . '</strong> tablas creadas</li>';
+                echo '<li>💾 <strong>' . $datos_insertados . '</strong> conjuntos de datos iniciales</li>';
                 echo '</ul>';
+                echo '<details><summary>Ver tablas creadas</summary><ul>';
+                foreach ($tablas_creadas as $tabla) {
+                    echo '<li><code>' . $tabla . '</code></li>';
+                }
+                echo '</ul></details>';
                 echo '</div>';
                 
                 echo '<div class="text-center">';

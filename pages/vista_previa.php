@@ -10,14 +10,61 @@ if (!isset($_SESSION['selected_ocs']) || empty($_SESSION['selected_ocs'])) {
     exit;
 }
 
-// Obtener datos de las OCs seleccionadas
+// Inicializar array de OCs temporales si no existe
+if (!isset($_SESSION['ocs_temporales'])) {
+    $_SESSION['ocs_temporales'] = [];
+}
+
+// Limpiar OCs temporales que ya están en BD (sincronizadas previamente)
+if (!empty($_SESSION['ocs_temporales'])) {
+    $pdo_temp = getConnection();
+    foreach ($_SESSION['ocs_temporales'] as $oc => $datos) {
+        $stmt_check = $pdo_temp->prepare("SELECT id FROM retiros_medidores WHERE orden_servicio = ?");
+        $stmt_check->execute([$oc]);
+        if ($stmt_check->fetch()) {
+            // Ya está en BD, eliminar de temporales
+            unset($_SESSION['ocs_temporales'][$oc]);
+        }
+    }
+}
+
+// Obtener datos de las OCs seleccionadas y su estado de registro
 try {
     $pdo = getConnection();
     $placeholders = str_repeat('?,', count($_SESSION['selected_ocs']) - 1) . '?';
-    $sql = "SELECT * FROM ordenes_servicio WHERE orden_servicio IN ($placeholders) ORDER BY orden_servicio";
+    $sql = "SELECT o.*, 
+                   CASE WHEN r.id IS NOT NULL THEN 1 ELSE 0 END as tiene_retiro
+            FROM ordenes_servicio o
+            LEFT JOIN retiros_medidores r ON o.orden_servicio = r.orden_servicio
+            WHERE o.orden_servicio IN ($placeholders) 
+            ORDER BY o.orden_servicio";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($_SESSION['selected_ocs']);
     $ordenes = $stmt->fetchAll();
+    
+    // Determinar estado de cada OC y contadores
+    $completadas = 0;
+    $temporales = 0;
+    foreach ($ordenes as &$orden) {
+        $oc = $orden['orden_servicio'];
+        
+        if ($orden['tiene_retiro']) {
+            // Ya está en BD
+            $orden['estado'] = 'completado';
+            $completadas++;
+        } elseif (isset($_SESSION['ocs_temporales'][$oc])) {
+            // Guardado temporal en sesión
+            $orden['estado'] = 'temporal';
+            $temporales++;
+        } else {
+            // Pendiente
+            $orden['estado'] = 'pendiente';
+        }
+    }
+    unset($orden); // Romper referencia
+    
+    $todasCompletadas = ($completadas == count($ordenes));
+    $hayTemporales = ($temporales > 0);
 } catch (Exception $e) {
     die("Error al cargar datos: " . $e->getMessage());
 }
@@ -25,6 +72,18 @@ try {
 $pageTitle = 'Vista Previa - Sistema GASELAG';
 require_once '../includes/header.php';
 ?>
+
+<?php if (isset($_GET['temporal']) && $_GET['temporal'] == 1): ?>
+    <div class="container mt-3">
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="bi bi-save-fill me-2"></i>
+            <strong>¡Datos guardados temporalmente!</strong> 
+            La OC <strong><?= htmlspecialchars($_GET['oc'] ?? '') ?></strong> ha sido guardada en sesión. 
+            <strong>No olvides sincronizar para guardar definitivamente.</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    </div>
+<?php endif; ?>
 
 <style>
         /* Hero gradient header */
@@ -75,36 +134,6 @@ require_once '../includes/header.php';
             50% { opacity: 0.7; }
         }
         
-        /* Progress indicator */
-        .progress-step {
-            position: relative;
-            padding-left: 40px;
-        }
-        .progress-step::before {
-            content: '';
-            position: absolute;
-            left: 15px;
-            top: 30px;
-            bottom: -30px;
-            width: 2px;
-            background: #dee2e6;
-        }
-        .progress-step:last-child::before {
-            display: none;
-        }
-        .step-icon {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 0.9rem;
-        }
         
         /* Responsive adjustments */
         @media (max-width: 767.98px) {
@@ -135,10 +164,27 @@ require_once '../includes/header.php';
                             <i class="bi bi-list-check me-1"></i>
                             <?= count($ordenes) ?> Orden<?= count($ordenes) > 1 ? 'es' : '' ?> de Servicio
                         </span>
-                        <span class="badge bg-success px-3 py-2">
-                            <i class="bi bi-check-circle me-1"></i>
-                            Listas para procesar
-                        </span>
+                        <?php if ($todasCompletadas): ?>
+                            <span class="badge bg-success px-3 py-2">
+                                <i class="bi bi-check-circle-fill me-1"></i>
+                                Todas sincronizadas
+                            </span>
+                        <?php elseif ($hayTemporales): ?>
+                            <span class="badge bg-warning text-dark px-3 py-2">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                <?= $temporales ?> sin sincronizar
+                            </span>
+                        <?php elseif ($completadas > 0): ?>
+                            <span class="badge bg-info px-3 py-2">
+                                <i class="bi bi-hourglass-split me-1"></i>
+                                <?= $completadas ?> de <?= count($ordenes) ?> sincronizadas
+                            </span>
+                        <?php else: ?>
+                            <span class="badge bg-secondary px-3 py-2">
+                                <i class="bi bi-clock me-1"></i>
+                                Listas para registrar
+                            </span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -147,36 +193,45 @@ require_once '../includes/header.php';
 
     <div class="container pb-4">
         <!-- Pasos del proceso -->
-        <div class="row mb-4">
-            <div class="col-lg-10 mx-auto">
+        <div class="row mb-3">
+            <div class="col-12">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-body p-4">
-                        <h6 class="text-primary mb-3">
-                            <i class="bi bi-diagram-3-fill me-2"></i>
-                            Proceso de Registro
-                        </h6>
-                        <div class="row g-0">
-                            <div class="col-md-4">
-                                <div class="progress-step">
-                                    <span class="step-icon bg-success text-white">
-                                        <i class="bi bi-check"></i>
-                                    </span>
-                                    <strong class="d-block mb-1">1. Búsqueda</strong>
-                                    <small class="text-muted">OCs encontradas y agregadas</small>
-                                </div>
+                    <div class="card-body p-3">
+                        <div class="row g-0 align-items-center">
+                            <div class="col-auto me-3">
+                                <i class="bi bi-diagram-3-fill text-primary fs-5"></i>
                             </div>
-                            <div class="col-md-4">
-                                <div class="progress-step">
-                                    <span class="step-icon bg-primary text-white">2</span>
-                                    <strong class="d-block mb-1">2. Vista Previa</strong>
-                                    <small class="text-success">Estás aquí - Verificando datos</small>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="progress-step">
-                                    <span class="step-icon bg-secondary text-white">3</span>
-                                    <strong class="d-block mb-1">3. Registro</strong>
-                                    <small class="text-muted">Completar formularios de retiro</small>
+                            <div class="col">
+                                <div class="row g-0">
+                                    <div class="col-md-4">
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-success rounded-circle me-2" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="bi bi-check"></i>
+                                            </span>
+                                            <div>
+                                                <strong class="d-block small">1. Búsqueda</strong>
+                                                <small class="text-muted" style="font-size: 0.75rem;">OCs agregadas</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-primary rounded-circle me-2" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">2</span>
+                                            <div>
+                                                <strong class="d-block small">2. Vista Previa</strong>
+                                                <small class="text-success" style="font-size: 0.75rem;">Estás aquí</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-secondary rounded-circle me-2" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">3</span>
+                                            <div>
+                                                <strong class="d-block small">3. Registro</strong>
+                                                <small class="text-muted" style="font-size: 0.75rem;">A tu ritmo</small>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -268,7 +323,21 @@ require_once '../includes/header.php';
                                         </small>
                                     </td>
                                     <td class="text-center">
-                                        <i class="bi bi-circle text-warning" title="Pendiente"></i>
+                                        <?php if ($orden['estado'] == 'completado'): ?>
+                                            <i class="bi bi-check-circle-fill text-success fs-5" title="Sincronizado en BD"></i>
+                                        <?php elseif ($orden['estado'] == 'temporal'): ?>
+                                            <a href="formulario_retiro.php?orden_servicio=<?= urlencode($orden['orden_servicio']) ?>" 
+                                               class="btn btn-sm btn-warning" 
+                                               title="Editar (guardado temporal)">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                        <?php else: ?>
+                                            <a href="formulario_retiro.php?orden_servicio=<?= urlencode($orden['orden_servicio']) ?>" 
+                                               class="btn btn-sm btn-primary" 
+                                               title="Registrar retiro">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -280,64 +349,82 @@ require_once '../includes/header.php';
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <small class="text-muted">
                         <i class="bi bi-info-circle"></i>
-                        Total: <strong><?= count($ordenes) ?></strong> orden<?= count($ordenes) > 1 ? 'es' : '' ?> para procesar
+                        Total: <strong><?= count($ordenes) ?></strong> orden<?= count($ordenes) > 1 ? 'es' : '' ?> | 
+                        <span class="text-success">✓ <?= $completadas ?></span> | 
+                        <span class="text-warning">⚠ <?= $temporales ?></span> | 
+                        <span class="text-primary">○ <?= count($ordenes) - $completadas - $temporales ?></span>
                     </small>
-                    <small class="text-muted d-none d-md-block">
-                        <i class="bi bi-circle text-warning"></i> Pendiente
-                    </small>
+                    <div class="d-flex gap-3 d-none d-md-flex">
+                        <small class="text-muted">
+                            <i class="bi bi-pencil-square text-primary"></i> Pendiente
+                        </small>
+                        <small class="text-muted">
+                            <i class="bi bi-pencil-square text-warning"></i> Temporal
+                        </small>
+                        <small class="text-muted">
+                            <i class="bi bi-check-circle-fill text-success"></i> Sincronizado
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Información adicional responsive -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <i class="bi bi-clipboard-check text-primary" style="font-size: 2.5rem;"></i>
-                        <h6 class="mt-3 mb-2">Registro Individual</h6>
-                        <p class="text-muted small mb-0">Cada OC tendrá su formulario de retiro independiente</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <i class="bi bi-camera text-success" style="font-size: 2.5rem;"></i>
-                        <h6 class="mt-3 mb-2">Evidencia Fotográfica</h6>
-                        <p class="text-muted small mb-0">Deberás tomar foto de cada medidor retirado</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <i class="bi bi-save text-info" style="font-size: 2.5rem;"></i>
-                        <h6 class="mt-3 mb-2">Guardado Automático</h6>
-                        <p class="text-muted small mb-0">Tu progreso se guarda automáticamente</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        
 
         <!-- Botones de acción -->
-        <div class="row g-3">
-            <div class="col-md-4">
-                <a href="buscar_oc.php" class="btn btn-outline-secondary w-100 btn-lg">
-                    <i class="bi bi-arrow-left-circle"></i>
-                    Modificar Selección
-                </a>
+        <?php if ($hayTemporales): ?>
+            <div class="alert alert-warning shadow-sm">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle-fill fs-2 me-3"></i>
+                    <div class="flex-grow-1">
+                        <strong class="d-block">¡Atención! Tienes <?= $temporales ?> OC<?= $temporales > 1 ? 's' : '' ?> sin sincronizar</strong>
+                        <small>Los datos están guardados temporalmente. Debes sincronizarlos para guardarlos definitivamente en la base de datos.</small>
+                    </div>
+                </div>
             </div>
-            <div class="col-md-8">
-                <a href="formulario_retiro.php?index=0" class="btn btn-success w-100 btn-lg shadow">
-                    <i class="bi bi-play-circle-fill me-2"></i>
-                    Comenzar Registro de Retiros
-                    <i class="bi bi-arrow-right ms-2"></i>
-                </a>
+            <div class="row g-3">
+                <div class="col-md-6 mx-auto">
+                    <button type="button" class="btn btn-success w-100 btn-lg shadow" id="btnSincronizar">
+                        <i class="bi bi-cloud-arrow-up me-2"></i>
+                        Sincronizar Todo a Base de Datos
+                        <i class="bi bi-check-circle ms-2"></i>
+                    </button>
+                </div>
             </div>
-        </div>
+        <?php elseif ($todasCompletadas): ?>
+            <div class="alert alert-success shadow-sm">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-check-circle-fill fs-2 me-3"></i>
+                    <div class="flex-grow-1">
+                        <strong class="d-block">¡Todas las OCs han sido sincronizadas!</strong>
+                        <small>Has completado el registro de todos los retiros en esta sesión.</small>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <a href="limpiar_sesion.php" class="btn btn-outline-secondary w-100 btn-lg">
+                        <i class="bi bi-trash me-2"></i>
+                        Limpiar Sesión y Buscar Nuevas OCs
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="finalizar.php" class="btn btn-success w-100 btn-lg shadow">
+                        <i class="bi bi-check2-all me-2"></i>
+                        Ver Resumen y Finalizar
+                        <i class="bi bi-arrow-right ms-2"></i>
+                    </a>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="alert alert-primary text-center">
+                <i class="bi bi-info-circle me-2"></i>
+                Haz clic en el ícono <i class="bi bi-pencil-square mx-1"></i> de cada OC para registrar su retiro en el orden que prefieras
+            </div>
+        <?php endif; ?>
 
         <!-- Ayuda colapsable -->
+         
         <div class="accordion mt-4" id="accordionAyuda">
             <div class="accordion-item border-0 shadow-sm">
                 <h2 class="accordion-header">
@@ -355,9 +442,9 @@ require_once '../includes/header.php';
                                     <span class="badge rounded-circle bg-light text-dark me-3" 
                                           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 600;">1</span>
                                     <div>
-                                        <strong class="d-block mb-1">Formulario por OC</strong>
+                                        <strong class="d-block mb-1">Registro Flexible</strong>
                                         <small class="text-muted">
-                                            Verás un formulario para cada orden, donde ingresarás los datos del retiro
+                                            Elige cualquier OC de la lista para registrar su retiro, sin orden específico
                                         </small>
                                     </div>
                                 </div>
@@ -367,9 +454,9 @@ require_once '../includes/header.php';
                                     <span class="badge rounded-circle bg-light text-dark me-3" 
                                           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 600;">2</span>
                                     <div>
-                                        <strong class="d-block mb-1">Navegación Secuencial</strong>
+                                        <strong class="d-block mb-1">Click en el Ícono</strong>
                                         <small class="text-muted">
-                                            Podrás avanzar y retroceder entre los formularios de las OCs
+                                            Haz clic en <i class="bi bi-pencil-square text-primary"></i> para abrir el formulario de esa OC
                                         </small>
                                     </div>
                                 </div>
@@ -379,9 +466,9 @@ require_once '../includes/header.php';
                                     <span class="badge rounded-circle bg-light text-dark me-3" 
                                           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 600;">3</span>
                                     <div>
-                                        <strong class="d-block mb-1">Captura de Fotos</strong>
+                                        <strong class="d-block mb-1">Completa y Regresa</strong>
                                         <small class="text-muted">
-                                            Desde tu cámara o galería, adjunta la evidencia fotográfica requerida
+                                            Llena el formulario y toma fotos. Al guardar, regresarás aquí automáticamente
                                         </small>
                                     </div>
                                 </div>
@@ -391,9 +478,9 @@ require_once '../includes/header.php';
                                     <span class="badge rounded-circle bg-light text-dark me-3" 
                                           style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 600;">4</span>
                                     <div>
-                                        <strong class="d-block mb-1">Finalización</strong>
+                                        <strong class="d-block mb-1">Marca de Completado</strong>
                                         <small class="text-muted">
-                                            Al completar todas las OCs, verás un resumen final de los registros
+                                            Las OCs registradas mostrarán <i class="bi bi-check-circle-fill text-success"></i> para indicar que están listas
                                         </small>
                                     </div>
                                 </div>
@@ -404,6 +491,65 @@ require_once '../includes/header.php';
             </div>
         </div>
     </div>
+
+<!-- JavaScript para Sincronización y Advertencias -->
+<script>
+// ========== ADVERTENCIA AL SALIR SIN SINCRONIZAR ==========
+<?php if ($hayTemporales): ?>
+window.addEventListener('beforeunload', function(e) {
+    e.preventDefault();
+    e.returnValue = '¡Tienes <?= $temporales ?> OC(s) sin sincronizar! Si sales ahora, perderás los datos temporales.';
+    return e.returnValue;
+});
+<?php endif; ?>
+
+// ========== BOTÓN DE SINCRONIZACIÓN ==========
+<?php if ($hayTemporales): ?>
+document.getElementById('btnSincronizar').addEventListener('click', function() {
+    const btn = this;
+    const originalHTML = btn.innerHTML;
+    
+    // Confirmar antes de sincronizar
+    if (!confirm('¿Estás seguro de que deseas sincronizar <?= $temporales ?> OC(s) a la base de datos?\n\nEsta acción guardará todos los retiros temporales de forma permanente.')) {
+        return;
+    }
+    
+    // Deshabilitar botón y mostrar progreso
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sincronizando...';
+    
+    // Enviar solicitud AJAX
+    fetch('sincronizar_retiros.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mostrar mensaje de éxito
+            alert('✅ ¡Sincronización exitosa!\n\n' + 
+                  data.sincronizados + ' OC(s) guardadas en la base de datos.');
+            
+            // Recargar página para actualizar estados
+            window.location.reload();
+        } else {
+            // Error
+            alert('❌ Error al sincronizar:\n\n' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error de conexión al sincronizar.\n\nPor favor, intenta nuevamente.');
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    });
+});
+<?php endif; ?>
+</script>
 
 <?php require_once '../includes/footer.php'; ?>
 

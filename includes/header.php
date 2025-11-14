@@ -271,7 +271,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                             <li><hr class="dropdown-divider"></li>
                             <?php endif; ?>
                             <li>
-                                <a class="dropdown-item" href="<?php echo $basePath; ?>pages/importar_datos_mejorado.php">
+                                <a class="dropdown-item" href="<?php echo $basePath; ?>pages/importar_datos.php">
                                     <i class="bi bi-file-earmark-arrow-up me-2"></i>Importar Datos
                                 </a>
                             </li>

@@ -1555,10 +1555,19 @@ function asignarOCATecnico($ordenServicio, $tecnicoId, $adminId, $notas = '') {
         }
         
         // 3. Verificar que no esté ya asignada en estado pendiente/en_proceso
-        $stmtAsignacion = $pdo->prepare("SELECT id FROM asignaciones_oc WHERE orden_servicio = ? AND estado IN ('pendiente', 'en_proceso')");
+        $stmtAsignacion = $pdo->prepare("SELECT id, tecnico_nombre, fecha_asignacion FROM asignaciones_oc WHERE orden_servicio = ? AND estado IN ('pendiente', 'en_proceso')");
         $stmtAsignacion->execute([$ordenServicio]);
-        if ($stmtAsignacion->fetch()) {
-            return ['success' => false, 'message' => "Esta OC ya está asignada a un técnico", 'id' => null];
+        $asignacionExistente = $stmtAsignacion->fetch();
+        
+        if ($asignacionExistente) {
+            $fechaAsignacion = date('d/m/Y', strtotime($asignacionExistente['fecha_asignacion']));
+            return [
+                'success' => false, 
+                'message' => "Esta OC ya está asignada a {$asignacionExistente['tecnico_nombre']} desde el {$fechaAsignacion}. Use la opción de reasignación si desea cambiarla.",
+                'id' => null,
+                'asignada' => true,
+                'tecnico_actual' => $asignacionExistente['tecnico_nombre']
+            ];
         }
         
         // 4. Obtener nombres
@@ -1600,12 +1609,88 @@ function asignarOCATecnico($ordenServicio, $tecnicoId, $adminId, $notas = '') {
         
         return [
             'success' => true,
-            'message' => "OC asignada exitosamente a {$tecnico['nombre_completo']}",
+            'message' => "✅ OC asignada exitosamente a {$tecnico['nombre_completo']}",
             'id' => $asignacionId
         ];
         
     } catch (PDOException $e) {
         error_log("Error al asignar OC: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Error en la base de datos', 'id' => null];
+    }
+}
+
+/**
+ * Reasignar una OC a un técnico diferente (cancela asignación anterior)
+ * @param string $ordenServicio Número de OC
+ * @param int $tecnicoId ID del nuevo técnico
+ * @param int $adminId ID del administrador que reasigna
+ * @param string $notas Notas opcionales
+ * @return array ['success' => bool, 'message' => string, 'id' => int|null]
+ */
+function reasignarOCATecnico($ordenServicio, $tecnicoId, $adminId, $notas = '') {
+    $pdo = getConnection();
+    
+    try {
+        // 1. Buscar la asignación activa
+        $stmtAsignacion = $pdo->prepare("SELECT id, tecnico_nombre, tecnico_id FROM asignaciones_oc WHERE orden_servicio = ? AND estado IN ('pendiente', 'en_proceso')");
+        $stmtAsignacion->execute([$ordenServicio]);
+        $asignacionAnterior = $stmtAsignacion->fetch();
+        
+        if (!$asignacionAnterior) {
+            return ['success' => false, 'message' => "Esta OC no tiene ninguna asignación activa", 'id' => null];
+        }
+        
+        $tecnicoAnteriorNombre = $asignacionAnterior['tecnico_nombre'];
+        
+        // 2. Cancelar asignación anterior
+        $stmtCancelar = $pdo->prepare("UPDATE asignaciones_oc SET estado = 'cancelada', fecha_cancelada = NOW(), motivo_cancelacion = 'Reasignada a otro técnico por administrador' WHERE id = ?");
+        $stmtCancelar->execute([$asignacionAnterior['id']]);
+        
+        // 3. Obtener datos para crear nueva asignación
+        $stmtOC = $pdo->prepare("SELECT id FROM ordenes_servicio WHERE orden_servicio = ?");
+        $stmtOC->execute([$ordenServicio]);
+        $oc = $stmtOC->fetch();
+        
+        $stmtTecnico = $pdo->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
+        $stmtTecnico->execute([$tecnicoId]);
+        $tecnico = $stmtTecnico->fetch();
+        
+        $stmtAdmin = $pdo->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
+        $stmtAdmin->execute([$adminId]);
+        $admin = $stmtAdmin->fetch();
+        
+        // 4. Crear nueva asignación
+        $sqlInsert = "INSERT INTO asignaciones_oc (
+            orden_servicio_id, orden_servicio, tecnico_id, tecnico_nombre,
+            admin_asigno_id, admin_nombre, estado, notas_admin
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)";
+        
+        $stmtInsert = $pdo->prepare($sqlInsert);
+        $stmtInsert->execute([
+            $oc['id'],
+            $ordenServicio,
+            $tecnicoId,
+            $tecnico['nombre_completo'],
+            $adminId,
+            $admin['nombre_completo'],
+            $notas
+        ]);
+        
+        $asignacionId = $pdo->lastInsertId();
+        
+        // 5. Log de auditoría
+        logAudit(null, $adminId, 'reasignacion_oc',
+                "OC {$ordenServicio} reasignada de {$tecnicoAnteriorNombre} a {$tecnico['nombre_completo']}",
+                $ordenServicio);
+        
+        return [
+            'success' => true,
+            'message' => "✅ OC reasignada exitosamente de {$tecnicoAnteriorNombre} a {$tecnico['nombre_completo']}",
+            'id' => $asignacionId
+        ];
+        
+    } catch (PDOException $e) {
+        error_log("Error al reasignar OC: " . $e->getMessage());
         return ['success' => false, 'message' => 'Error en la base de datos', 'id' => null];
     }
 }
@@ -1826,12 +1911,21 @@ function iniciarTrabajoAsignacion($asignacionId, $tecnicoId) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$asignacionId, $tecnicoId]);
         
-        // Auditoría
-        logAudit(null, $tecnicoId, 'inicio_trabajo_asignacion',
-                "Técnico inició trabajo en asignación ID {$asignacionId}",
-                null);
+        // Verificar si se actualizó alguna fila
+        $filasActualizadas = $stmt->rowCount();
         
-        return true;
+        if ($filasActualizadas > 0) {
+            // Auditoría solo si se actualizó
+            logAudit(null, $tecnicoId, 'inicio_trabajo_asignacion',
+                    "Técnico inició trabajo en asignación ID {$asignacionId}",
+                    null);
+            
+            return true;
+        } else {
+            // No se actualizó nada (probablemente ya estaba en proceso)
+            error_log("No se actualizó la asignación {$asignacionId} - puede que ya esté en proceso");
+            return false;
+        }
         
     } catch (PDOException $e) {
         error_log("Error al iniciar trabajo: " . $e->getMessage());
