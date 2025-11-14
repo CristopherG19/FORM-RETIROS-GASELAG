@@ -352,21 +352,33 @@ Catálogo de motivos de imposibilidad de retiro:
 
 ## 📸 Nomenclatura de Fotos
 
+### Fotos de Imposibilidad (Inmediatas)
 Las fotos de imposibilidad se guardan con el formato:
 ```
-OC-xxxxx_NumSuministro_NumSerie_FechaHora.extension
+OC-xxxxx_NumSuministro_FechaHora.extension
 ```
 
 **Ejemplo:**
 ```
-OC-00001_5367165_EA22282911_20251025_143022.jpg
+OC-00001_5367165_20251025_143022.jpg
+```
+
+### Evidencias Fotográficas (Posteriores - 6 horas)
+Las evidencias adjuntadas posteriormente se guardan con el formato:
+```
+evidencia_RetiroID_FechaHora_Hash.extension
+```
+
+**Ejemplo:**
+```
+evidencia_123_20251025_143022_a1b2c3d4.jpg
 ```
 
 Esto permite:
-- ✅ Identificación única
+- ✅ Identificación única por OC y suministro
 - ✅ Trazabilidad completa
-- ✅ Ordenamiento por fecha
-- ✅ Búsqueda fácil
+- ✅ Ordenamiento cronológico
+- ✅ Búsqueda rápida y eficiente
 
 ---
 
@@ -410,27 +422,91 @@ Solución:
 
 ```
 form gaselag retiros/
-├── config/
-│   └── database.php          # Configuración de BD
-├── database/
-│   └── schema.sql             # Script de creación
-├── pages/
+├── config/                    # Configuración del sistema
+│   ├── database.php          # Configuración de BD
+│   ├── AppConfig.php         # Configuración general
+│   ├── SecurityConfig.php    # Configuración de seguridad
+│   └── ...                   # Otros archivos de configuración
+├── database/                  # Scripts de base de datos
+│   ├── schema.sql            # Script de creación
+│   └── migration_*.sql       # Migraciones
+├── pages/                     # Páginas del sistema
 │   ├── buscar_oc.php         # Búsqueda de OCs
 │   ├── consultar_retiros.php # Consulta y filtros
 │   ├── detalle_retiro.php    # Vista detallada
 │   ├── exportar_excel.php    # Exportación CSV
-│   ├── finalizar.php         # Página de éxito
 │   ├── formulario_retiro.php # Registro de retiro
+│   ├── gestion_*.php         # Módulos de gestión (admin)
 │   ├── importar_datos.php    # Importación masiva
-│   └── vista_previa.php      # Preview de selección
-├── uploads/                   # Fotos de imposibilidad
-├── datos_ejemplo.txt          # Datos de prueba
+│   └── ...                   # Otras páginas
+├── includes/                  # Componentes compartidos
+│   ├── header.php            # Encabezado común
+│   ├── footer.php            # Pie de página común
+│   └── session_middleware.php # Middleware de sesión
+├── uploads/                   # Archivos subidos
+│   ├── perfiles/             # Fotos de perfil
+│   └── *.png, *.jpg          # Evidencias de imposibilidad
+├── docs/                      # 📚 Documentación técnica
+│   ├── CHANGELOG.md          # Registro de cambios
+│   ├── GUIA_*.md             # Guías técnicas
+│   └── ...                   # Otra documentación
+├── tools/                     # 🔧 Herramientas y scripts
+│   ├── verificar_instalacion.php  # Verificador
+│   ├── limpiar_bloqueos.php  # Limpieza de bloqueos
+│   ├── diagnostico_*.php     # Scripts de diagnóstico
+│   └── ...                   # Otras herramientas
+├── templates/                 # 📄 Plantillas de importación
+│   ├── plantilla_importacion_gaselag.csv
+│   └── data ejemplo programa.xlsm
+├── backups/                   # 💾 Respaldos del sistema
+│   └── backups_actualizacion_*/
 ├── index.php                  # Página principal
+├── login.php                  # Página de login
+├── logout.php                 # Cerrar sesión
 ├── instalar.php              # Instalador automático
 ├── INICIAR_AQUI.html         # Acceso rápido
-├── verificar_instalacion.php # Verificador
 └── README.md                  # Esta documentación
 ```
+
+---
+
+## 📂 Organización de Carpetas
+
+El proyecto está organizado de manera óptima para facilitar el mantenimiento y escalabilidad:
+
+### 📚 `docs/` - Documentación
+Toda la documentación técnica, guías, changelogs y diagnósticos del sistema.
+- Historial de actualizaciones y correcciones
+- Guías técnicas de funcionalidades
+- Documentación de arquitectura y flujos
+- Ver [docs/README.md](docs/README.md) para más detalles
+
+### 🔧 `tools/` - Herramientas
+Scripts de mantenimiento, diagnóstico y administración del sistema.
+- Verificación de instalación
+- Scripts de limpieza y optimización
+- Herramientas de diagnóstico
+- Generadores de utilidades
+- Ver [tools/README.md](tools/README.md) para más detalles
+
+### 📄 `templates/` - Plantillas
+Archivos de ejemplo y plantillas para importación de datos.
+- Plantillas CSV para importación
+- Archivos Excel de ejemplo
+- Ver [templates/README.md](templates/README.md) para más detalles
+
+### 💾 `backups/` - Respaldos
+Carpeta para almacenar respaldos del sistema y actualizaciones anteriores.
+- Backups de base de datos
+- Backups de archivos
+- Versiones anteriores del sistema
+
+### 📦 Otras Carpetas Principales
+- **`config/`** - Archivos de configuración del sistema
+- **`database/`** - Scripts SQL y migraciones
+- **`pages/`** - Páginas funcionales del sistema
+- **`includes/`** - Componentes compartidos (header, footer, middleware)
+- **`uploads/`** - Archivos subidos por usuarios (evidencias, perfiles)
 
 ---
 
@@ -441,8 +517,7 @@ form gaselag retiros/
 Login:         http://localhost/form%20gaselag%20retiros/login.php
 Principal:     http://localhost/form%20gaselag%20retiros/
 Instalador:    http://localhost/form%20gaselag%20retiros/instalar.php
-Actualizador:  http://localhost/form%20gaselag%20retiros/actualizar_sistema.php
-Verificador:   http://localhost/form%20gaselag%20retiros/verificar_instalacion.php
+Verificador:   http://localhost/form%20gaselag%20retiros/tools/verificar_instalacion.php
 Logout:        http://localhost/form%20gaselag%20retiros/logout.php
 ```
 
@@ -539,16 +614,18 @@ Este sistema está diseñado para **uso en red local**. Para producción:
 
 ### Exportar Base de Datos
 ```sql
-mysqldump -u root -p gaselag_retiros > backup.sql
+mysqldump -u root -p gaselag_retiros > backups/backup_FECHA.sql
 ```
 
 ### Restaurar Base de Datos
 ```sql
-mysql -u root -p gaselag_retiros < backup.sql
+mysql -u root -p gaselag_retiros < backups/backup_FECHA.sql
 ```
 
 ### Respaldo de Fotos
-Copiar la carpeta `uploads/` regularmente.
+Copiar la carpeta `uploads/` regularmente a `backups/uploads_FECHA/`.
+
+**Nota:** La carpeta `backups/` está lista para almacenar todos tus respaldos.
 
 ---
 
