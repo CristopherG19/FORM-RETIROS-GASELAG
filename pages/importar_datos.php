@@ -266,7 +266,7 @@ function convertExcelDateToMySQL($date) {
                 </h2>
                 <p class="text-muted mb-0">
                     Carga masiva de datos desde Excel o CSV
-                    <a href="../GUIA_IMPORTACION_CSV.md" target="_blank" class="ms-2 text-decoration-none">
+                    <a href="../docs/GUIA_IMPORTACION_CSV.md" target="_blank" class="ms-2 text-decoration-none">
                         <i class="bi bi-question-circle"></i> Ver guía completa
                     </a>
                 </p>

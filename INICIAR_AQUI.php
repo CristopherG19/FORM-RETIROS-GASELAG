@@ -115,35 +115,11 @@
         </div>
 
         <div style="margin: 30px 0;">
-            <a href="reinstalar_completo.php" class="button" style="background: #dc3545;">
-                🔄 Reinstalación Completa
-            </a>
-            <br>
-            <small style="color: #666;">⚠️ Elimina TODO y recrea desde cero (para cambiar de PC)</small>
-        </div>
-
-        <div style="margin: 30px 0;">
-            <a href="actualizar_aislamiento.php" class="button secondary">
-                🔄 Actualizar Sistema
-            </a>
-            <br>
-            <small style="color: #666;">Agregar autenticación y aislamiento de datos</small>
-        </div>
-
-        <div style="margin: 30px 0;">
-            <a href="actualizar_imposibilidad.php" class="button secondary">
-                📋 Tipos de Imposibilidad
-            </a>
-            <br>
-            <small style="color: #666;">Agregar catálogo de motivos de no retiro</small>
-        </div>
-
-        <div style="margin: 30px 0;">
             <a href="login.php" class="button">
                 🔐 Iniciar Sesión
             </a>
             <br>
-            <small style="color: #666;">Acceder al sistema con usuario y contraseña</small>
+            <small style="color: #666;">Acceder al sistema (después de instalar)</small>
         </div>
 
         <div style="margin: 30px 0;">
@@ -151,25 +127,27 @@
                 🏠 Panel Principal
             </a>
             <br>
-            <small style="color: #666;">Requiere autenticación</small>
+            <small style="color: #666;">Ir directamente al sistema (si ya tienes sesión)</small>
         </div>
 
         <div style="margin: 30px 0;">
-            <a href="verificar_instalacion.php" class="button secondary">
-                🔍 Verificar Estado
+            <a href="tools/verificar_instalacion.php" class="button secondary">
+                🔍 Verificar Estado del Sistema
             </a>
             <br>
-            <small style="color: #666;">Comprobar que todo funciona</small>
+            <small style="color: #666;">Herramienta de diagnóstico (tools/)</small>
         </div>
 
         <hr style="margin: 30px 0;">
 
         <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">
-            <strong>⚠️ Configuración Completa:</strong><br>
-            1. <strong>"Instalar / Configurar BD"</strong> - Base de datos completa (primera vez)<br>
-            2. <strong>"Actualizar Sistema"</strong> - Agregar autenticación y aislamiento<br>
-            3. <strong>"Tipos de Imposibilidad"</strong> - Agregar catálogo de motivos de no retiro<br>
-            4. <strong>"Iniciar Sesión"</strong> - Acceder con las credenciales arriba
+            <strong>⚠️ Primera Instalación:</strong><br>
+            1. Asegúrate de que Apache y MySQL estén iniciados en XAMPP<br>
+            2. Haz clic en <strong>"🔧 Instalar Sistema"</strong><br>
+            3. Espera a que termine la instalación<br>
+            4. Haz clic en <strong>"🔐 Iniciar Sesión"</strong> con las credenciales de arriba<br>
+            <br>
+            <strong>✅ Sistema ya instalado?</strong> Ve directamente a <strong>"🔐 Iniciar Sesión"</strong>
         </div>
     </div>
 </body>

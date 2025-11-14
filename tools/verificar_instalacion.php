@@ -83,7 +83,7 @@
     echo '</div>';
 
     // 4. Verificar archivo de configuración
-    $configExists = file_exists('config/database.php');
+    $configExists = file_exists(__DIR__ . '/../config/database.php');
     echo '<div class="check ' . ($configExists ? 'success' : 'error') . '">';
     echo '<span class="icon">' . ($configExists ? '✅' : '❌') . '</span>';
     echo '<strong>Archivo de Configuración:</strong> ' . ($configExists ? 'Existe' : 'NO ENCONTRADO');
@@ -95,7 +95,7 @@
 
     // 5. Verificar conexión a base de datos
     if ($configExists) {
-        require_once 'config/database.php';
+        require_once __DIR__ . '/../config/database.php';
         try {
             $pdo = getConnection();
             echo '<div class="check success">';
@@ -149,8 +149,8 @@
     }
 
     // 8. Verificar carpeta uploads
-    $uploadsExists = is_dir('uploads');
-    $uploadsWritable = $uploadsExists && is_writable('uploads');
+    $uploadsExists = is_dir(__DIR__ . '/../uploads');
+    $uploadsWritable = $uploadsExists && is_writable(__DIR__ . '/../uploads');
     echo '<div class="check ' . ($uploadsWritable ? 'success' : ($uploadsExists ? 'warning' : 'error')) . '">';
     echo '<span class="icon">' . ($uploadsWritable ? '✅' : ($uploadsExists ? '⚠️' : '❌')) . '</span>';
     echo '<strong>Carpeta Uploads:</strong> ';
@@ -187,7 +187,7 @@
         echo '<div class="check success">';
         echo '<h3>🎉 ¡TODO ESTÁ PERFECTO!</h3>';
         echo '<p>El sistema está listo para usar.</p>';
-        echo '<p><a href="index.php" style="display: inline-block; background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Ir al Sistema</a></p>';
+        echo '<p><a href="../index.php" style="display: inline-block; background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Ir al Sistema</a></p>';
         echo '</div>';
     } else {
         if ($errores > 0) {
@@ -207,7 +207,7 @@
 
     <hr>
     <p><small>Versión 1.0.0 - Sistema GASELAG</small></p>
-    <p><a href="?">🔄 Verificar Nuevamente</a> | <a href="index.php">🏠 Ir al Sistema</a></p>
+    <p><a href="?">🔄 Verificar Nuevamente</a> | <a href="../index.php">🏠 Ir al Sistema</a> | <a href="../INICIAR_AQUI.php">🚀 Página de Inicio</a></p>
 </body>
 </html>
 
