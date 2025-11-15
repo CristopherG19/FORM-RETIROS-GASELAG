@@ -138,6 +138,14 @@
             <small style="color: #666;">Herramienta de diagnóstico (tools/)</small>
         </div>
 
+        <div style="margin: 30px 0;">
+            <a href="acceso_movil.php" class="button" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                📱 Acceso desde Celular
+            </a>
+            <br>
+            <small style="color: #666;">Obtén la IP y QR code para acceder desde tu móvil</small>
+        </div>
+
         <hr style="margin: 30px 0;">
 
         <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">

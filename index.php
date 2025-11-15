@@ -280,6 +280,17 @@ require_once 'includes/header.php';
                     </div>
                 </div>
             </div>
+
+            <!-- Sistema de Backups -->
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card module-card h-100 shadow-sm" onclick="location.href='pages/admin_backups.php'">
+                    <div class="card-body text-center p-3 p-md-4">
+                        <i class="bi bi-shield-check text-success card-icon" style="font-size: 2.5rem;"></i>
+                        <h6 class="card-title mt-3 mb-2">Sistema de Backups</h6>
+                        <p class="card-text text-muted small d-none d-lg-block">Respaldos automáticos</p>
+                    </div>
+                </div>
+            </div>
         </div>
         <?php endif; ?>
 

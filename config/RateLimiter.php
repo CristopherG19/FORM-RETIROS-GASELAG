@@ -351,3 +351,167 @@ function getLoginStats($hours = 24) {
         return [];
     }
 }
+
+/**
+ * Obtener logins exitosos recientes
+ */
+function getRecentSuccessfulLogins($hours = 24, $limit = 50) {
+    try {
+        $pdo = getConnection();
+        $since = date('Y-m-d H:i:s', time() - ($hours * 3600));
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                la.username, 
+                la.ip_address, 
+                la.attempt_time,
+                la.user_agent,
+                u.nombre_completo,
+                u.rol
+            FROM login_attempts la
+            LEFT JOIN usuarios u ON la.username = u.username
+            WHERE la.attempt_time > ? AND la.success = 1
+            ORDER BY la.attempt_time DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$since, $limit]);
+        return $stmt->fetchAll();
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo logins exitosos: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Obtener historial de desbloqueos manuales
+ */
+function getUnlockHistory($hours = 168, $limit = 50) {
+    try {
+        $pdo = getConnection();
+        $since = date('Y-m-d H:i:s', time() - ($hours * 3600));
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                ar.accion,
+                ar.descripcion,
+                ar.fecha,
+                ar.ip_address,
+                u_target.username as cuenta_desbloqueada,
+                u_target.nombre_completo as nombre_cuenta,
+                u_admin.username as admin_username,
+                u_admin.nombre_completo as admin_nombre
+            FROM auditoria_retiros ar
+            LEFT JOIN usuarios u_target ON ar.usuario_id = u_target.id
+            LEFT JOIN usuarios u_admin ON ar.usuario_id = u_admin.id
+            WHERE ar.accion = 'cuenta_desbloqueada' 
+                AND ar.fecha > ?
+            ORDER BY ar.fecha DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$since, $limit]);
+        return $stmt->fetchAll();
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo historial de desbloqueos: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Detectar actividades sospechosas y generar alertas
+ */
+function detectSecurityAlerts($hours = 24) {
+    try {
+        $pdo = getConnection();
+        $since = date('Y-m-d H:i:s', time() - ($hours * 3600));
+        $alerts = [];
+        
+        // Alerta 1: IPs con muchos intentos fallidos (>10)
+        $stmt = $pdo->prepare("
+            SELECT ip_address, COUNT(*) as count
+            FROM login_attempts 
+            WHERE attempt_time > ? AND success = 0
+            GROUP BY ip_address 
+            HAVING count > 10
+        ");
+        $stmt->execute([$since]);
+        $suspiciousIPs = $stmt->fetchAll();
+        
+        foreach ($suspiciousIPs as $ip) {
+            $alerts[] = [
+                'type' => 'danger',
+                'icon' => 'bi-exclamation-triangle-fill',
+                'message' => "IP {$ip['ip_address']} tiene {$ip['count']} intentos fallidos (posible ataque de fuerza bruta)"
+            ];
+        }
+        
+        // Alerta 2: Cuentas de admin bloqueadas
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as count
+            FROM usuarios
+            WHERE rol = 'admin' AND bloqueado = 1
+        ");
+        $stmt->execute();
+        $blockedAdmins = $stmt->fetch()['count'];
+        
+        if ($blockedAdmins > 0) {
+            $alerts[] = [
+                'type' => 'danger',
+                'icon' => 'bi-shield-exclamation',
+                'message' => "{$blockedAdmins} cuenta(s) de administrador bloqueadas - Revisar inmediatamente"
+            ];
+        }
+        
+        // Alerta 3: Múltiples usuarios bloqueados en corto tiempo
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as count
+            FROM usuarios
+            WHERE bloqueado = 1 
+                AND bloqueado_hasta > NOW()
+        ");
+        $stmt->execute();
+        $totalBlocked = $stmt->fetch()['count'];
+        
+        if ($totalBlocked >= 5) {
+            $alerts[] = [
+                'type' => 'warning',
+                'icon' => 'bi-exclamation-circle-fill',
+                'message' => "{$totalBlocked} cuentas bloqueadas simultáneamente - Posible ataque coordinado"
+            ];
+        }
+        
+        // Alerta 4: Logins exitosos desde IPs con intentos fallidos previos
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT la1.username, la1.ip_address
+            FROM login_attempts la1
+            WHERE la1.success = 1 
+                AND la1.attempt_time > ?
+                AND EXISTS (
+                    SELECT 1 FROM login_attempts la2
+                    WHERE la2.ip_address = la1.ip_address
+                        AND la2.username = la1.username
+                        AND la2.success = 0
+                        AND la2.attempt_time < la1.attempt_time
+                        AND la2.attempt_time > DATE_SUB(la1.attempt_time, INTERVAL 1 HOUR)
+                )
+            LIMIT 5
+        ");
+        $stmt->execute([$since]);
+        $suspiciousLogins = $stmt->fetchAll();
+        
+        foreach ($suspiciousLogins as $login) {
+            $alerts[] = [
+                'type' => 'warning',
+                'icon' => 'bi-shield-fill-exclamation',
+                'message' => "Usuario '{$login['username']}' ingresó exitosamente desde IP {$login['ip_address']} después de varios intentos fallidos"
+            ];
+        }
+        
+        return $alerts;
+        
+    } catch (Exception $e) {
+        error_log("Error detectando alertas de seguridad: " . $e->getMessage());
+        return [];
+    }
+}

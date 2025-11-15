@@ -215,6 +215,12 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                                     <i class="bi bi-camera me-2"></i>Gestión de Evidencias
                                 </a>
                             </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="<?php echo $basePath; ?>pages/admin_backups.php">
+                                    <i class="bi bi-shield-check text-success me-2"></i>Sistema de Backups
+                                </a>
+                            </li>
                         </ul>
                     </li>
                     <?php endif; ?>
