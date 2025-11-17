@@ -7,6 +7,9 @@
  * Se debe ejecutar diariamente a las 2:00 AM mediante tarea programada
  */
 
+// Configurar zona horaria (Perú)
+date_default_timezone_set('America/Lima');
+
 // Configuracion
 $config = [
     'email_enabled' => true,

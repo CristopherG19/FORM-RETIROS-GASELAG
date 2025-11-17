@@ -146,6 +146,41 @@
             <small style="color: #666;">Obtén la IP y QR code para acceder desde tu móvil</small>
         </div>
 
+        <div style="background: #d1ecf1; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #0dcaf0;">
+            <h3 style="margin-top: 0; color: #055160;">🔧 ¿No puedes acceder desde el móvil?</h3>
+            <p style="margin-bottom: 15px;">Ejecuta estos scripts para diagnosticar y solucionar:</p>
+            
+            <div style="display: grid; gap: 10px;">
+                <div style="background: white; padding: 15px; border-radius: 8px;">
+                    <strong>1️⃣ diagnosticar_acceso_movil.bat</strong>
+                    <br>
+                    <small>Identifica automáticamente qué está fallando</small>
+                </div>
+                
+                <div style="background: white; padding: 15px; border-radius: 8px;">
+                    <strong>2️⃣ obtener_ip_local.bat</strong>
+                    <br>
+                    <small>Tu IP puede haber cambiado (causa más común)</small>
+                </div>
+                
+                <div style="background: white; padding: 15px; border-radius: 8px;">
+                    <strong>3️⃣ configurar_firewall.bat</strong> <span style="background: #ffc107; padding: 2px 8px; border-radius: 4px; font-size: 0.8em;">Como Admin</span>
+                    <br>
+                    <small>Configura el Firewall para permitir conexiones</small>
+                </div>
+                
+                <div style="background: white; padding: 15px; border-radius: 8px;">
+                    <strong>4️⃣ configurar_apache_red_local.bat</strong>
+                    <br>
+                    <small>Configura Apache para aceptar conexiones externas</small>
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px;">
+                <small><strong>📖 Guía completa:</strong> Abre <code>SOLUCION_ACCESO_MOVIL.md</code></small>
+            </div>
+        </div>
+
         <hr style="margin: 30px 0;">
 
         <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">

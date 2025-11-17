@@ -7,6 +7,9 @@
  * y los organiza por fecha y periodo (diario/semanal/mensual)
  */
 
+// Configurar zona horaria (Perú)
+date_default_timezone_set('America/Lima');
+
 // Configuracion
 $config = [
     'db_host' => 'localhost',

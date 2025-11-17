@@ -7,6 +7,9 @@
  * Mantiene: 7 dias diarios, 4 semanas semanales, 12 meses mensuales
  */
 
+// Configurar zona horaria (Perú)
+date_default_timezone_set('America/Lima');
+
 // Configuracion
 $config = [
     'backup_path' => dirname(__DIR__),

@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 echo ========================================
 echo  GASELAG - Obtener IP Local para Movil
 echo ========================================
@@ -16,6 +17,7 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
     echo.
     echo Para el login directo:
     echo http://!IP!/form%%20gaselag%%20retiros/login.php
+    echo.
 )
 
 echo.
@@ -27,4 +29,5 @@ echo  3. Firewall debe permitir puerto 80
 echo ========================================
 echo.
 pause
+
 

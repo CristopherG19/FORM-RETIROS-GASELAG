@@ -4,6 +4,9 @@
  * GASELAG - Sistema de Retiros de Medidores
  */
 
+// Configurar zona horaria (Perú)
+date_default_timezone_set('America/Lima');
+
 // Incluir clases de seguridad
 require_once __DIR__ . '/SecurityConfig.php';
 require_once __DIR__ . '/PasswordPolicy.php';

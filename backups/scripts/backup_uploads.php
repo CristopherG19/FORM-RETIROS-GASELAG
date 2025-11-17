@@ -7,6 +7,9 @@
  * (fotos de evidencias, imposibilidades, perfiles)
  */
 
+// Configurar zona horaria (Perú)
+date_default_timezone_set('America/Lima');
+
 // Configuracion
 $config = [
     'uploads_path' => dirname(dirname(__DIR__)) . '/uploads', // Carpeta uploads del sistema

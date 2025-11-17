@@ -255,3 +255,4 @@ Si tienes problemas, verifica:
 4. ✅ PC y celular en misma red WiFi
 5. ✅ IP correcta (no cambió)
 
+
