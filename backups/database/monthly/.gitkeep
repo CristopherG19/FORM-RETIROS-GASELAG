@@ -1,0 +1,3 @@
+# Este archivo mantiene la estructura de carpetas en Git
+# Los backups reales (.sql, .zip) están excluidos por .gitignore
+

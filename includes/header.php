@@ -217,6 +217,11 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
+                                <a class="dropdown-item" href="<?php echo $basePath; ?>pages/admin_desbloquear_cuentas.php">
+                                    <i class="bi bi-shield-lock text-danger me-2"></i>Seguridad del Sistema
+                                </a>
+                            </li>
+                            <li>
                                 <a class="dropdown-item" href="<?php echo $basePath; ?>pages/admin_backups.php">
                                     <i class="bi bi-shield-check text-success me-2"></i>Sistema de Backups
                                 </a>

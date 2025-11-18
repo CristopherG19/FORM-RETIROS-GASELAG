@@ -1,45 +1,101 @@
-# Archivos y carpetas de desarrollo local
+# ==========================================
+# ARCHIVOS DE CONFIGURACIÓN SENSIBLES
+# ==========================================
+# ⚠️ NUNCA subir archivos con credenciales
+config/environment.php
+config/credentials.php
+# config/database.php (comentado porque puede ser necesario)
+
+# ==========================================
+# UPLOADS Y ARCHIVOS DE USUARIO
+# ==========================================
 uploads/*.png
 uploads/*.jpg
 uploads/*.jpeg
 uploads/*.gif
+uploads/*.pdf
+uploads/perfiles/*.jpg
+uploads/perfiles/*.png
+uploads/perfiles/*.jpeg
+uploads/perfiles/*.gif
 !uploads/index.php
 !uploads/.htaccess
 
-# Configuración local (opcional, descomentar si tienes credenciales sensibles)
-# config/database.php
+# ==========================================
+# BACKUPS AUTOMÁTICOS
+# ==========================================
+# Excluir todos los backups generados automáticamente
+backups/database/daily/*.sql
+backups/database/daily/*.zip
+backups/database/weekly/*.sql
+backups/database/weekly/*.zip
+backups/database/monthly/*.sql
+backups/database/monthly/*.zip
 
-# Archivos de sistema
+backups/uploads_backup/daily/*.zip
+backups/uploads_backup/weekly/*.zip
+backups/uploads_backup/monthly/*.zip
+
+# Mantener estructura de carpetas pero no contenido
+!backups/database/daily/.gitkeep
+!backups/database/weekly/.gitkeep
+!backups/database/monthly/.gitkeep
+!backups/uploads_backup/daily/.gitkeep
+!backups/uploads_backup/weekly/.gitkeep
+!backups/uploads_backup/monthly/.gitkeep
+
+# ==========================================
+# LOGS
+# ==========================================
+*.log
+logs/*.log
+backups/logs/*.log
+
+# ==========================================
+# ARCHIVOS DE SISTEMA
+# ==========================================
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Archivos de IDE
+# ==========================================
+# ARCHIVOS DE IDE
+# ==========================================
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
 
-# Archivos temporales
+# ==========================================
+# ARCHIVOS TEMPORALES
+# ==========================================
 *.tmp
 *.temp
-*.log
 
-# Archivos de respaldo
+# ==========================================
+# ARCHIVOS DE RESPALDO
+# ==========================================
 *.bak
 *.backup
 *~
 
+# ==========================================
 # PHP
+# ==========================================
 vendor/
 composer.lock
 
-# Node modules (si se usa en el futuro)
+# ==========================================
+# NODE MODULES (si se usa en el futuro)
+# ==========================================
 node_modules/
 package-lock.json
 
-# Archivos de prueba locales
+# ==========================================
+# ARCHIVOS DE PRUEBA LOCALES
+# ==========================================
 test.php
 prueba.php
+test_*.php
 
 
