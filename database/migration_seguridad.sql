@@ -4,7 +4,7 @@
 -- Descripción: Agrega sistema de seguridad mejorado
 -- ========================================
 
-USE gaselag_retiros;
+USE gaselagc_sistema_retiro;
 
 -- ========================================
 -- 1. MODIFICAR TABLA USUARIOS

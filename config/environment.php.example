@@ -24,7 +24,7 @@
 // CONFIGURAR AMBIENTE ACTUAL
 // ==========================================
 // Cambiar a 'production' cuando subas a hosting
-define('ENVIRONMENT', 'development');
+define('ENVIRONMENT', 'production');
 // ==========================================
 
 // Configuraciones por ambiente
@@ -48,12 +48,12 @@ $config = [
     'production' => [
         'db_host' => 'localhost',         // Generalmente localhost en cPanel
         'db_port' => '3306',              // Puerto estándar
-        'db_user' => 'USUARIO_CPANEL',    // ⚠️ CAMBIAR: Usuario de MySQL en cPanel
-        'db_pass' => 'PASSWORD_SEGURO',   // ⚠️ CAMBIAR: Contraseña de MySQL
-        'db_name' => 'USUARIO_gaselag',   // ⚠️ CAMBIAR: Nombre de la BD en cPanel
-        'base_url' => 'https://tudominio.com/retiros/', // ⚠️ CAMBIAR: URL de producción
-        'debug' => false,                 // NO mostrar errores en producción
-        'display_errors' => false,
+        'db_user' => 'gaselagc_usuario_admin',    // ⚠️ CAMBIAR: Usuario de MySQL en cPanel
+        'db_pass' => 'ml~*UU#-LJJ!9&8^',   // ⚠️ CAMBIAR: Contraseña de MySQL
+        'db_name' => 'gaselagc_sistema_retiro',   // ⚠️ CAMBIAR: Nombre de la BD en cPanel
+        'base_url' => 'https://www.gaselag.com/retiros/', // ⚠️ CAMBIAR: URL de producción
+        'debug' => true,                 // NO mostrar errores en producción
+        'display_errors' => true,
         'session_timeout' => 3600,        // 1 hora (más seguro en producción)
         'upload_path' => '../uploads/',
         'timezone' => 'America/Lima'

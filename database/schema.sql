@@ -1,7 +1,7 @@
 -- Base de datos para el sistema de retiro de medidores GASELAG
 -- Creación de la base de datos
-CREATE DATABASE IF NOT EXISTS gaselag_retiros CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE gaselag_retiros;
+CREATE DATABASE IF NOT EXISTS gaselagc_sistema_retiro CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE gaselagc_sistema_retiro;
 
 -- Tabla de usuarios para el sistema de autenticación (DEBE CREARSE PRIMERO)
 CREATE TABLE IF NOT EXISTS usuarios (

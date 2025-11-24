@@ -46,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($result['success']) {
                 // Marcar como login exitoso para mostrar pantalla de bienvenida
                 $loginSuccess = true;
-                $userName = $result['user_name'];
-                $userRole = $result['user_role'];
+                $userName = $result['nombre_completo'] ?? $result['user_name'] ?? 'Usuario';
+                $userRole = $result['rol'] ?? $result['user_role'] ?? 'user';
                 
                 // Verificar si debe cambiar contraseña
                 if ($result['force_password_change']) {
@@ -211,11 +211,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
                                 <h4 class="text-success mb-3">¡Bienvenido!</h4>
                                 <p class="text-muted mb-2">
-                                    <strong><?php echo htmlspecialchars($userName); ?></strong>
+                                    <strong><?php echo htmlspecialchars($userName ?? 'Usuario'); ?></strong>
                                 </p>
                                 <p class="text-muted mb-4">
                                     <small>
-                                        <?php echo $userRole === 'admin' ? '🔐 Administrador' : '🔧 Técnico'; ?>
+                                        <?php echo ($userRole ?? 'user') === 'admin' ? '🔐 Administrador' : '🔧 Técnico'; ?>
                                     </small>
                                 </p>
                                 <div class="spinner-border text-primary" role="status">
@@ -276,8 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                        class="form-control text-center" 
                                        id="username" 
                                        name="username"
-                                       inputmode="numeric"
-                                       pattern="[0-9a-zA-Z]*"
+                                       inputmode="text"
                                        required 
                                        autocomplete="username" 
                                        placeholder="Ingrese DNI o usuario"
@@ -294,7 +293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                        class="form-control text-center" 
                                        id="password" 
                                        name="password"
-                                       inputmode="numeric"
+                                       inputmode="text"
                                        required 
                                        autocomplete="current-password" 
                                        placeholder="Ingrese PIN o contraseña"

@@ -1,7 +1,7 @@
 -- Migración: Agregar campos adicionales de perfil a usuarios
 -- Fecha: 1 de noviembre de 2025
 
-USE gaselag_retiros;
+USE gaselagc_sistema_retiro;
 
 -- Agregar nuevos campos a la tabla usuarios
 ALTER TABLE usuarios 

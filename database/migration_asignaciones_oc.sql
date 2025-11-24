@@ -5,7 +5,7 @@
 --              específicas a técnicos de forma individual o masiva
 -- ================================================
 
-USE gaselag_retiros;
+USE gaselagc_sistema_retiro;
 
 -- Tabla para asignaciones de OCs a técnicos
 CREATE TABLE IF NOT EXISTS asignaciones_oc (

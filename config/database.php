@@ -2,7 +2,19 @@
 /**
  * Configuración de conexión a base de datos
  * GASELAG - Sistema de Retiros de Medidores
+ * 
+ * Este archivo carga la configuración del ambiente correcto
  */
+
+// Cargar configuración de ambientes
+require_once __DIR__ . '/environment.php';
+
+// Las constantes ya están definidas en environment.php:
+// - DB_HOST
+// - DB_PORT
+// - DB_USER
+// - DB_PASS
+// - DB_NAME
 
 // Configurar zona horaria (Perú)
 date_default_timezone_set('America/Lima');
@@ -13,11 +25,6 @@ require_once __DIR__ . '/PasswordPolicy.php';
 require_once __DIR__ . '/RateLimiter.php';
 
 // Configuración de base de datos
-define('DB_HOST', 'localhost');
-define('DB_PORT', '3307');  // Puerto personalizado de MySQL
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'gaselag_retiros');
 define('DB_CHARSET', 'utf8mb4');
 
 // Crear conexión
@@ -46,6 +53,7 @@ require_once __DIR__ . '/RateLimiter.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
 
 // Generar ID de sesión único si no existe
 if (!isset($_SESSION['session_id'])) {
