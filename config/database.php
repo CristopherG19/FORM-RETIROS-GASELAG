@@ -1315,9 +1315,11 @@ function getEstadisticasCumplimientoEvidencia($userId = null) {
                     COUNT(CASE WHEN evidencia_completa = 'SI' THEN 1 END) as evidencia_completa,
                     COUNT(CASE WHEN evidencia_obligatoria = 'SI' AND evidencia_completa = 'NO' AND fecha_limite_evidencia < NOW() THEN 1 END) as evidencia_vencida,
                     COUNT(CASE WHEN sancion_aplicada = 'SI' THEN 1 END) as sanciones_aplicadas,
-                    ROUND(
-                        (COUNT(CASE WHEN evidencia_completa = 'SI' THEN 1 END) /
-                         NULLIF(COUNT(CASE WHEN evidencia_obligatoria = 'SI' THEN 1 END), 0)) * 100, 2
+                    COALESCE(
+                        ROUND(
+                            (COUNT(CASE WHEN evidencia_completa = 'SI' THEN 1 END) /
+                             NULLIF(COUNT(CASE WHEN evidencia_obligatoria = 'SI' THEN 1 END), 0)) * 100, 2
+                        ), 0
                     ) as porcentaje_cumplimiento
                 FROM retiros_medidores
                 WHERE medidor_retirado = 'NO'";
@@ -1335,7 +1337,14 @@ function getEstadisticasCumplimientoEvidencia($userId = null) {
         return $stmt->fetch();
     } catch (PDOException $e) {
         error_log("Error al obtener estadísticas de cumplimiento: " . $e->getMessage());
-        return null;
+        return [
+            'total_no_retirados' => 0,
+            'requiere_evidencia' => 0,
+            'evidencia_completa' => 0,
+            'evidencia_vencida' => 0,
+            'sanciones_aplicadas' => 0,
+            'porcentaje_cumplimiento' => 0
+        ];
     }
 }
 

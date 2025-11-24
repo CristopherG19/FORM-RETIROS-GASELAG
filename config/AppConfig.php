@@ -2,12 +2,18 @@
 /**
  * Configuración del sistema optimizada
  * GASELAG - Sistema de Retiros de Medidores
+ * 
+ * DEPENDENCIAS: Requiere environment.php para funciones de ambiente
  */
+
+// Cargar configuración de ambiente (necesario para isDevelopment())
+require_once __DIR__ . '/environment.php';
 
 // ===== CONFIGURACIÓN GENERAL =====
 define('APP_NAME', 'GASELAG - Sistema de Retiros');
 define('APP_VERSION', '2.0.0');
-define('APP_ENV', 'production'); // development, production
+// Nota: APP_ENV ahora usa ENVIRONMENT de environment.php
+define('APP_ENV', ENVIRONMENT);
 
 // ===== CONFIGURACIÓN DE ARCHIVOS =====
 define('UPLOAD_DIR', 'uploads/');
@@ -42,7 +48,7 @@ function getAppConfig($key = null) {
     $config = [
         'name' => APP_NAME,
         'version' => APP_VERSION,
-        'environment' => APP_ENV,
+        'environment' => ENVIRONMENT, // Usa ENVIRONMENT de environment.php
         'upload_dir' => UPLOAD_DIR,
         'max_file_size' => MAX_FILE_SIZE,
         'session_lifetime' => SESSION_LIFETIME,
@@ -52,13 +58,6 @@ function getAppConfig($key = null) {
     ];
     
     return $key ? ($config[$key] ?? null) : $config;
-}
-
-/**
- * Verifica si estamos en modo desarrollo
- */
-function isDevelopment() {
-    return APP_ENV === 'development';
 }
 
 /**

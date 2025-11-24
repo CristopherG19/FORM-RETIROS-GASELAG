@@ -169,7 +169,7 @@ require_once '../includes/header.php';
                 <div class="col-md-3">
                     <div class="card stats-card text-center bg-info text-white">
                         <div class="card-body">
-                            <h5 class="card-title"><?php echo number_format($estadisticas['porcentaje_cumplimiento'], 1); ?>%</h5>
+                            <h5 class="card-title"><?php echo number_format($estadisticas['porcentaje_cumplimiento'] ?? 0, 1); ?>%</h5>
                             <p class="card-text mb-0">Cumplimiento</p>
                         </div>
                     </div>

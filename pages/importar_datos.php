@@ -290,7 +290,7 @@ function convertExcelDateToMySQL($date) {
                                 <div class="d-flex justify-content-between align-items-center w-100">
                                     <div class="flex-grow-1">
                                         <p class="mb-1 small opacity-75">Total de Registros</p>
-                                        <h3 class="mb-0 fw-bold"><?php echo number_format($totalRegistros); ?></h3>
+                                        <h3 class="mb-0 fw-bold"><?php echo number_format($totalRegistros ?? 0); ?></h3>
                                     </div>
                                     <div>
                                         <i class="bi bi-database fs-1 opacity-50"></i>

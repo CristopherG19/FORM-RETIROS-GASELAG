@@ -263,7 +263,7 @@ require_once '../includes/header.php';
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-1">Total de OC</h6>
-                                <h2 class="mb-0"><?= number_format($stats['total_oc']) ?></h2>
+                                <h2 class="mb-0"><?= number_format($stats['total_oc'] ?? 0) ?></h2>
                             </div>
                             <i class="bi bi-file-earmark-text text-primary" style="font-size: 2.5rem;"></i>
                         </div>
@@ -276,7 +276,7 @@ require_once '../includes/header.php';
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-1">Con Retiro Registrado</h6>
-                                <h2 class="mb-0 text-success"><?= number_format($stats['registrados']) ?></h2>
+                                <h2 class="mb-0 text-success"><?= number_format($stats['registrados'] ?? 0) ?></h2>
                             </div>
                             <i class="bi bi-check-circle text-success" style="font-size: 2.5rem;"></i>
                         </div>
@@ -289,7 +289,7 @@ require_once '../includes/header.php';
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted mb-1">Pendientes de Registro</h6>
-                                <h2 class="mb-0 text-warning"><?= number_format($stats['pendientes']) ?></h2>
+                                <h2 class="mb-0 text-warning"><?= number_format($stats['pendientes'] ?? 0) ?></h2>
                             </div>
                             <i class="bi bi-clock-history text-warning" style="font-size: 2.5rem;"></i>
                         </div>

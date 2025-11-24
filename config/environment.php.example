@@ -1,7 +1,15 @@
 <?php
 /**
- * Configuración de Ambientes - PLANTILLA
+ * Configuración de Ambientes - PLANTILLA (EJEMPLO)
  * Sistema GASELAG - Retiros de Medidores
+ * 
+ * ⚠️ ESTE ES EL ARCHIVO MAESTRO DE CONFIGURACIÓN
+ * 
+ * IMPORTANTE:
+ * - database.php depende de este archivo
+ * - AppConfig.php depende de este archivo
+ * - Define ENVIRONMENT, isDevelopment(), isProduction()
+ * - Cambia entre desarrollo/producción en UN SOLO LUGAR
  * 
  * ⚠️ INSTRUCCIONES DE INSTALACIÓN:
  * 
@@ -16,8 +24,7 @@
  * 
  * 4. NUNCA subir environment.php al repositorio (ya está en .gitignore)
  * 
- * Este archivo permite que el mismo código funcione en ambos ambientes
- * solo cambiando una línea.
+ * Ver docs/ARQUITECTURA_CONFIGURACION.md para más detalles
  */
 
 // ==========================================
